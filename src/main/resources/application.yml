@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: club-pr-sla-tool
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/club_sla}
+    username: ${SPRING_DATASOURCE_USERNAME:club_sla}
+    password: ${SPRING_DATASOURCE_PASSWORD:club_sla}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

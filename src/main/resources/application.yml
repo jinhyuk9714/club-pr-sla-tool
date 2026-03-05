@@ -35,3 +35,6 @@ discord:
 sla:
   policy:
     fallback-36h-enabled: ${SLA_FALLBACK_36H_ENABLED:false}
+  scanner:
+    interval-ms: ${SLA_SCANNER_INTERVAL_MS:300000}
+    initial-delay-ms: ${SLA_SCANNER_INITIAL_DELAY_MS:300000}

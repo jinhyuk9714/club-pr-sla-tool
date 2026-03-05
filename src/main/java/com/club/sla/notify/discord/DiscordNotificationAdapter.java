@@ -48,7 +48,13 @@ public class DiscordNotificationAdapter implements NotificationPort {
     }
 
     deadLetterRepository.save(
-        new DeadLetterEvent(DEAD_LETTER_REASON, payload.content(), Instant.now(clock)));
+        new DeadLetterEvent(
+            DEAD_LETTER_REASON,
+            payload.content(),
+            Instant.now(clock),
+            message.repoId(),
+            message.prNumber(),
+            message.stage()));
 
     throw lastException == null
         ? new IllegalStateException("discord notification failed without exception details")

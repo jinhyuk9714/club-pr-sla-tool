@@ -19,6 +19,10 @@ spring:
       port: ${SPRING_REDIS_PORT:6379}
 
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoints:
     web:
       exposure:

@@ -67,6 +67,24 @@ Spring Boot 기반 PR 리뷰 SLA 운영 도구입니다. GitHub PR 이벤트를 
   - `sla_scan_runs_total`
   - `sla_scan_failures_total`
 
+## Ops APIs (MVP 5)
+
+- Dead letter list:
+  - `GET /api/admin/dead-letters?status=PENDING&limit=50`
+- Dead letter replay:
+  - `POST /api/admin/dead-letters/{id}/replay`
+  - Status codes:
+    - `200` replay success
+    - `404` dead letter not found
+    - `409` already replayed
+    - `422` legacy row without `repoId/prNumber/stage`
+    - `502` replay delivery failed
+- Manual single-PR reevaluation:
+  - `POST /api/repositories/{repositoryId}/pull-requests/{prNumber}/sla/re-evaluate`
+  - Status codes:
+    - `200` reevaluated
+    - `404` PR state not found
+
 ## Branch Protection Guide
 
 GitHub 저장소에서 아래 설정을 권장합니다.

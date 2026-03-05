@@ -31,6 +31,11 @@
    - `curl http://localhost:8080/api/repositories/1/dashboard`
 10. (Prometheus metrics check):
    - `curl http://localhost:8080/actuator/prometheus | grep -E "sla_notifications_total|sla_scan_runs_total|sla_scan_failures_total"`
+11. (Dead letter admin check):
+   - `curl "http://localhost:8080/api/admin/dead-letters?status=PENDING&limit=20"`
+   - `curl -X POST http://localhost:8080/api/admin/dead-letters/{id}/replay`
+12. (Manual SLA re-evaluate check):
+   - `curl -X POST http://localhost:8080/api/repositories/{repositoryId}/pull-requests/{prNumber}/sla/re-evaluate`
 
 ## Shutdown
 

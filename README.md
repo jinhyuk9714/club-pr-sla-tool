@@ -14,9 +14,9 @@ Spring Boot 기반 PR 리뷰 SLA 운영 도구입니다. GitHub PR 이벤트를 
 
 ## Branch Strategy
 
-- Trunk 기반으로 `main` 브랜치를 기준으로 PR 머지합니다.
+- Trunk 기반으로 `master` 브랜치를 기준으로 PR 머지합니다.
 - 기능 브랜치는 `codex/*` 또는 `feature/*` 패턴을 사용합니다.
-- `main`은 보호 브랜치로 설정하고 CI green일 때만 머지합니다.
+- `master`는 보호 브랜치로 설정하고 CI green일 때만 머지합니다.
 
 ## Quick Start (10min)
 

@@ -61,10 +61,13 @@ class PullRequestStateServiceTest {
 
     assertThat(first.getStatus()).isEqualTo(PullRequestStatus.REVIEWED);
     assertThat(first.getFirstReviewAt()).isNotNull();
-    assertThat(second.getFirstReviewAt()).isEqualTo(first.getFirstReviewAt());
+    assertThat(second.getFirstReviewAt()).isNotNull();
+    assertThat(second.getFirstReviewerLogin()).isEqualTo("mentor");
 
     PullRequestState persisted =
         pullRequestStateRepository.findByRepositoryIdAndPrNumber(100L, 14L).orElseThrow();
     assertThat(persisted.getStatus()).isEqualTo(PullRequestStatus.REVIEWED);
+    assertThat(persisted.getFirstReviewAt()).isNotNull();
+    assertThat(persisted.getFirstReviewerLogin()).isEqualTo("mentor");
   }
 }

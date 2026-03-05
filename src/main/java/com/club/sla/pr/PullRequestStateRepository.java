@@ -8,6 +8,8 @@ public interface PullRequestStateRepository extends JpaRepository<PullRequestSta
 
   Optional<PullRequestState> findByRepositoryIdAndPrNumber(Long repositoryId, Long prNumber);
 
+  List<PullRequestState> findByRepositoryIdAndReadyAtIsNotNull(Long repositoryId);
+
   List<PullRequestState> findByStatusAndReadyAtIsNotNullAndFirstReviewAtIsNull(
       PullRequestStatus status);
 }

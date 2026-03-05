@@ -51,6 +51,22 @@ Spring Boot 기반 PR 리뷰 SLA 운영 도구입니다. GitHub PR 이벤트를 
 - Configure secret:
   - `GITHUB_WEBHOOK_SECRET` in `.env`
 
+## Dashboard Endpoint (MVP 4)
+
+- `GET /api/repositories/{repositoryId}/dashboard`
+- Example:
+  - `curl http://localhost:8080/api/repositories/1/dashboard`
+- Response:
+  - `{"onTrack":0,"atRisk":0,"breached":0}`
+
+## Metrics (MVP 4)
+
+- Exposed via `GET /actuator/prometheus`
+- SLA metrics:
+  - `sla_notifications_total{stage="REMIND_12H|ESCALATE_24H|FALLBACK_36H"}`
+  - `sla_scan_runs_total`
+  - `sla_scan_failures_total`
+
 ## Branch Protection Guide
 
 GitHub 저장소에서 아래 설정을 권장합니다.

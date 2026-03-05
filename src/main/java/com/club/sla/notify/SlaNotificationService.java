@@ -1,5 +1,6 @@
 package com.club.sla.notify;
 
+import com.club.sla.metrics.SlaMetrics;
 import com.club.sla.sla.SlaEventLog;
 import com.club.sla.sla.SlaEventLogRepository;
 import java.time.Clock;
@@ -12,12 +13,16 @@ public class SlaNotificationService {
 
   private final NotificationPort notificationPort;
   private final SlaEventLogRepository slaEventLogRepository;
+  private final SlaMetrics slaMetrics;
   private final Clock clock = Clock.systemUTC();
 
   public SlaNotificationService(
-      NotificationPort notificationPort, SlaEventLogRepository slaEventLogRepository) {
+      NotificationPort notificationPort,
+      SlaEventLogRepository slaEventLogRepository,
+      SlaMetrics slaMetrics) {
     this.notificationPort = notificationPort;
     this.slaEventLogRepository = slaEventLogRepository;
+    this.slaMetrics = slaMetrics;
   }
 
   public void dispatch(NotificationMessage message) {
@@ -27,6 +32,7 @@ public class SlaNotificationService {
     }
 
     notificationPort.send(message);
+    slaMetrics.incrementNotification(message.stage());
 
     try {
       slaEventLogRepository.save(

@@ -1,5 +1,6 @@
 package com.club.sla.sla;
 
+import com.club.sla.metrics.SlaMetrics;
 import com.club.sla.notify.NotificationMessage;
 import com.club.sla.notify.SlaNotificationService;
 import com.club.sla.pr.PullRequestState;
@@ -23,6 +24,7 @@ public class SlaScannerJob {
   private final PullRequestStateRepository pullRequestStateRepository;
   private final SlaEventLogRepository slaEventLogRepository;
   private final SlaNotificationService slaNotificationService;
+  private final SlaMetrics slaMetrics;
   private final SlaEngine slaEngine = new SlaEngine();
   private final Clock clock = Clock.systemUTC();
 
@@ -33,11 +35,13 @@ public class SlaScannerJob {
       SchedulerLockService schedulerLockService,
       PullRequestStateRepository pullRequestStateRepository,
       SlaEventLogRepository slaEventLogRepository,
-      SlaNotificationService slaNotificationService) {
+      SlaNotificationService slaNotificationService,
+      SlaMetrics slaMetrics) {
     this.schedulerLockService = schedulerLockService;
     this.pullRequestStateRepository = pullRequestStateRepository;
     this.slaEventLogRepository = slaEventLogRepository;
     this.slaNotificationService = slaNotificationService;
+    this.slaMetrics = slaMetrics;
   }
 
   @Scheduled(
@@ -49,6 +53,7 @@ public class SlaScannerJob {
     }
 
     try {
+      slaMetrics.incrementScanRun();
       List<PullRequestState> trackablePullRequests =
           pullRequestStateRepository.findByStatusAndReadyAtIsNotNullAndFirstReviewAtIsNull(
               PullRequestStatus.READY);
@@ -56,6 +61,9 @@ public class SlaScannerJob {
       for (PullRequestState pullRequest : trackablePullRequests) {
         processPullRequest(pullRequest, now);
       }
+    } catch (RuntimeException ex) {
+      slaMetrics.incrementScanFailure();
+      throw ex;
     } finally {
       schedulerLockService.unlock(LOCK_NAME);
     }

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.club.sla.metrics.SlaMetrics;
 import com.club.sla.notify.NotificationMessage;
 import com.club.sla.notify.SlaNotificationService;
 import com.club.sla.pr.PullRequestState;
@@ -30,6 +31,7 @@ class SlaScannerJobTest {
   @Mock private PullRequestStateRepository pullRequestStateRepository;
   @Mock private SlaEventLogRepository slaEventLogRepository;
   @Mock private SlaNotificationService slaNotificationService;
+  @Mock private SlaMetrics slaMetrics;
 
   @InjectMocks private SlaScannerJob slaScannerJob;
 
@@ -43,6 +45,7 @@ class SlaScannerJobTest {
         .findByStatusAndReadyAtIsNotNullAndFirstReviewAtIsNull(PullRequestStatus.READY);
     verify(slaNotificationService, never()).dispatch(any(NotificationMessage.class));
     verify(schedulerLockService, never()).unlock("sla-scan");
+    verify(slaMetrics, never()).incrementScanRun();
   }
 
   @Test
@@ -61,6 +64,7 @@ class SlaScannerJobTest {
     verify(slaNotificationService, times(1))
         .dispatch(eq(new NotificationMessage(1L, 101L, SlaAction.REMIND_12H)));
     verify(schedulerLockService, times(1)).unlock("sla-scan");
+    verify(slaMetrics, times(1)).incrementScanRun();
   }
 
   @Test
@@ -79,6 +83,7 @@ class SlaScannerJobTest {
 
     verify(slaNotificationService, never()).dispatch(any(NotificationMessage.class));
     verify(schedulerLockService, times(1)).unlock("sla-scan");
+    verify(slaMetrics, times(1)).incrementScanRun();
   }
 
   @Test
@@ -97,6 +102,7 @@ class SlaScannerJobTest {
 
     verify(slaNotificationService, never()).dispatch(any(NotificationMessage.class));
     verify(schedulerLockService, times(1)).unlock("sla-scan");
+    verify(slaMetrics, times(1)).incrementScanRun();
   }
 
   @Test
@@ -119,6 +125,7 @@ class SlaScannerJobTest {
 
     verify(slaNotificationService, times(2)).dispatch(any(NotificationMessage.class));
     verify(schedulerLockService, times(1)).unlock("sla-scan");
+    verify(slaMetrics, times(1)).incrementScanRun();
   }
 
   @Test
@@ -135,6 +142,8 @@ class SlaScannerJobTest {
     }
 
     verify(schedulerLockService, times(1)).unlock("sla-scan");
+    verify(slaMetrics, times(1)).incrementScanRun();
+    verify(slaMetrics, times(1)).incrementScanFailure();
   }
 
   private PullRequestState readyPullRequest(Long repoId, Long prNumber, Instant readyAt) {

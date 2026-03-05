@@ -28,6 +28,10 @@ github:
   webhook:
     secret: ${GITHUB_WEBHOOK_SECRET:}
 
+discord:
+  webhook:
+    url: ${DISCORD_WEBHOOK_URL:}
+
 sla:
   policy:
     fallback-36h-enabled: ${SLA_FALLBACK_36H_ENABLED:false}

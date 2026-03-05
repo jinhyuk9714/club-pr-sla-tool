@@ -41,6 +41,16 @@ Spring Boot 기반 PR 리뷰 SLA 운영 도구입니다. GitHub PR 이벤트를 
 - `./gradlew check`
 - `./gradlew bootRun`
 
+## Webhook Endpoint (MVP 1)
+
+- `POST /api/webhooks/github`
+- Required headers:
+  - `X-Hub-Signature-256`
+  - `X-GitHub-Delivery`
+  - `X-GitHub-Event`
+- Configure secret:
+  - `GITHUB_WEBHOOK_SECRET` in `.env`
+
 ## Branch Protection Guide
 
 GitHub 저장소에서 아래 설정을 권장합니다.

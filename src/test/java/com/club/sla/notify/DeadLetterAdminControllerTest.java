@@ -1,26 +1,31 @@
 package com.club.sla.notify;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.club.sla.audit.AdminAuditLogService;
 import com.club.sla.sla.SlaAction;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(DeadLetterAdminController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class DeadLetterAdminControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
   @MockBean private DeadLetterReplayService deadLetterReplayService;
+  @MockBean private AdminAuditLogService adminAuditLogService;
 
   @Test
   void returnsDeadLettersWithStatusFilterAndLimit() throws Exception {
@@ -46,6 +51,17 @@ class DeadLetterAdminControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].id").value(10))
         .andExpect(jsonPath("$[0].replayStatus").value("PENDING"));
+    verify(adminAuditLogService)
+        .record(
+            "DEAD_LETTER_LIST",
+            "/api/admin/dead-letters",
+            "GET",
+            200,
+            "SUCCESS",
+            null,
+            null,
+            null,
+            null);
   }
 
   @Test
@@ -64,6 +80,17 @@ class DeadLetterAdminControllerTest {
         .perform(post("/api/admin/dead-letters/10/replay"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.replayStatus").value("REPLAYED"));
+    verify(adminAuditLogService)
+        .record(
+            "DEAD_LETTER_REPLAY",
+            "/api/admin/dead-letters/10/replay",
+            "POST",
+            200,
+            "SUCCESS",
+            null,
+            null,
+            10L,
+            null);
   }
 
   @Test
@@ -72,6 +99,17 @@ class DeadLetterAdminControllerTest {
         .willThrow(new DeadLetterReplayService.DeadLetterNotFoundException(404L));
 
     mockMvc.perform(post("/api/admin/dead-letters/404/replay")).andExpect(status().isNotFound());
+    verify(adminAuditLogService)
+        .record(
+            "DEAD_LETTER_REPLAY",
+            "/api/admin/dead-letters/404/replay",
+            "POST",
+            404,
+            "NOT_FOUND",
+            null,
+            null,
+            404L,
+            "dead letter not found: 404");
   }
 
   @Test

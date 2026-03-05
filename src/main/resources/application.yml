@@ -42,3 +42,10 @@ sla:
   scanner:
     interval-ms: ${SLA_SCANNER_INTERVAL_MS:300000}
     initial-delay-ms: ${SLA_SCANNER_INITIAL_DELAY_MS:300000}
+
+ops:
+  security:
+    admin-api-key: ${OPS_ADMIN_API_KEY:}
+    rate-limit:
+      max-requests: ${OPS_SECURITY_RATE_LIMIT_MAX_REQUESTS:60}
+      window-seconds: ${OPS_SECURITY_RATE_LIMIT_WINDOW_SECONDS:60}

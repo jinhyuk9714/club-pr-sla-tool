@@ -5,7 +5,9 @@ import com.club.sla.sla.SlaEventLogRepository;
 import java.time.Clock;
 import java.time.Instant;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
 
+@Service
 public class SlaNotificationService {
 
   private final NotificationPort notificationPort;

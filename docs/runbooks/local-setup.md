@@ -27,6 +27,10 @@
    - `  -d '{"action":"ready_for_review","repository":{"id":1},"pull_request":{"number":1,"user":{"login":"alice"}}}'`
    - Expected with invalid signature: `401`
 8. (Scanner local check) lower `SLA_SCANNER_INTERVAL_MS` to `10000` and verify logs every 10 seconds.
+9. (Dashboard API check):
+   - `curl http://localhost:8080/api/repositories/1/dashboard`
+10. (Prometheus metrics check):
+   - `curl http://localhost:8080/actuator/prometheus | grep -E "sla_notifications_total|sla_scan_runs_total|sla_scan_failures_total"`
 
 ## Shutdown
 

@@ -510,7 +510,7 @@ class DashboardControllerTest {
     @Test
     void returnsSlaSummary() throws Exception {
         when(queryService.fetch(anyLong())).thenReturn(new DashboardDto(4, 2, 1));
-        mvc.perform(get("/api/workspaces/1/dashboard"))
+        mvc.perform(get("/api/repositories/1/dashboard"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.onTrack").value(4))
             .andExpect(jsonPath("$.atRisk").value(2))
@@ -527,9 +527,9 @@ Expected: FAIL.
 **Step 3: Write minimal implementation**
 
 ```java
-@GetMapping("/api/workspaces/{workspaceId}/dashboard")
-public DashboardDto dashboard(@PathVariable Long workspaceId) {
-    return queryService.fetch(workspaceId);
+@GetMapping("/api/repositories/{repositoryId}/dashboard")
+public DashboardDto dashboard(@PathVariable Long repositoryId) {
+    return queryService.fetch(repositoryId);
 }
 ```
 

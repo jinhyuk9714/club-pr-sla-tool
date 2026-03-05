@@ -15,6 +15,7 @@ import com.club.sla.notify.NotificationMessage;
 import com.club.sla.sla.SlaAction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -61,7 +62,14 @@ class DiscordNotificationAdapterTest {
 
     verify(discordWebhookClient, times(3))
         .post(anyString(), any(DiscordWebhookClient.DiscordWebhookPayload.class));
-    verify(deadLetterRepository, times(1)).save(any(DeadLetterEvent.class));
+    ArgumentCaptor<DeadLetterEvent> deadLetterCaptor =
+        ArgumentCaptor.forClass(DeadLetterEvent.class);
+    verify(deadLetterRepository, times(1)).save(deadLetterCaptor.capture());
+    DeadLetterEvent deadLetterEvent = deadLetterCaptor.getValue();
+    org.assertj.core.api.Assertions.assertThat(deadLetterEvent.getRepoId()).isEqualTo(10L);
+    org.assertj.core.api.Assertions.assertThat(deadLetterEvent.getPrNumber()).isEqualTo(101L);
+    org.assertj.core.api.Assertions.assertThat(deadLetterEvent.getStage())
+        .isEqualTo(SlaAction.ESCALATE_24H);
   }
 
   @Test

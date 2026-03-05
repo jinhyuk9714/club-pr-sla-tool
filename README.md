@@ -14,9 +14,9 @@ Spring Boot 기반 PR 리뷰 SLA 운영 도구입니다. GitHub PR 이벤트를 
 
 ## Branch Strategy
 
-- Trunk 기반으로 `main` 브랜치를 기준으로 PR 머지합니다.
+- Trunk 기반으로 `master` 브랜치를 기준으로 PR 머지합니다.
 - 기능 브랜치는 `codex/*` 또는 `feature/*` 패턴을 사용합니다.
-- `main`은 보호 브랜치로 설정하고 CI green일 때만 머지합니다.
+- `master`는 보호 브랜치로 설정하고 CI green일 때만 머지합니다.
 
 ## Quick Start (10min)
 
@@ -66,6 +66,24 @@ Spring Boot 기반 PR 리뷰 SLA 운영 도구입니다. GitHub PR 이벤트를 
   - `sla_notifications_total{stage="REMIND_12H|ESCALATE_24H|FALLBACK_36H"}`
   - `sla_scan_runs_total`
   - `sla_scan_failures_total`
+
+## Ops APIs (MVP 5)
+
+- Dead letter list:
+  - `GET /api/admin/dead-letters?status=PENDING&limit=50`
+- Dead letter replay:
+  - `POST /api/admin/dead-letters/{id}/replay`
+  - Status codes:
+    - `200` replay success
+    - `404` dead letter not found
+    - `409` already replayed
+    - `422` legacy row without `repoId/prNumber/stage`
+    - `502` replay delivery failed
+- Manual single-PR reevaluation:
+  - `POST /api/repositories/{repositoryId}/pull-requests/{prNumber}/sla/re-evaluate`
+  - Status codes:
+    - `200` reevaluated
+    - `404` PR state not found
 
 ## Branch Protection Guide
 

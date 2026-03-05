@@ -7,6 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.club.sla.metrics.SlaMetrics;
 import com.club.sla.sla.SlaAction;
 import com.club.sla.sla.SlaEventLog;
 import com.club.sla.sla.SlaEventLogRepository;
@@ -24,6 +25,8 @@ class SlaNotificationServiceTest {
 
   @Mock private SlaEventLogRepository slaEventLogRepository;
 
+  @Mock private SlaMetrics slaMetrics;
+
   @InjectMocks private SlaNotificationService slaNotificationService;
 
   @Test
@@ -39,6 +42,7 @@ class SlaNotificationServiceTest {
 
     verify(notificationPort, times(1)).send(message);
     verify(slaEventLogRepository, times(1)).save(any(SlaEventLog.class));
+    verify(slaMetrics, times(1)).incrementNotification(SlaAction.REMIND_12H);
   }
 
   @Test
@@ -57,6 +61,8 @@ class SlaNotificationServiceTest {
     verify(notificationPort, times(1)).send(remind);
     verify(notificationPort, times(1)).send(escalate);
     verify(slaEventLogRepository, times(2)).save(any(SlaEventLog.class));
+    verify(slaMetrics, times(1)).incrementNotification(SlaAction.REMIND_12H);
+    verify(slaMetrics, times(1)).incrementNotification(SlaAction.ESCALATE_24H);
   }
 
   @Test
@@ -73,6 +79,7 @@ class SlaNotificationServiceTest {
 
     verify(notificationPort, times(1)).send(message);
     verify(slaEventLogRepository, times(1)).save(any(SlaEventLog.class));
+    verify(slaMetrics, times(1)).incrementNotification(SlaAction.REMIND_12H);
   }
 
   @Test
@@ -86,5 +93,6 @@ class SlaNotificationServiceTest {
 
     verify(notificationPort, never()).send(any(NotificationMessage.class));
     verify(slaEventLogRepository, never()).save(any(SlaEventLog.class));
+    verify(slaMetrics, never()).incrementNotification(any(SlaAction.class));
   }
 }

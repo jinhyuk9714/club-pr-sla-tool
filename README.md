@@ -66,8 +66,14 @@ Spring Boot 기반 PR 리뷰 SLA 운영 도구입니다. GitHub PR 이벤트를 
   - `sla_notifications_total{stage="REMIND_12H|ESCALATE_24H|FALLBACK_36H"}`
   - `sla_scan_runs_total`
   - `sla_scan_failures_total`
+- Ops security metrics:
+  - `ops_auth_failures_total{endpoint="..."}`
+  - `ops_rate_limited_total{endpoint="..."}`
 
 ## Ops APIs (MVP 5)
+
+- Required header for all ops APIs:
+  - `X-Admin-Api-Key: <OPS_ADMIN_API_KEY>`
 
 - Dead letter list:
   - `GET /api/admin/dead-letters?status=PENDING&limit=50`
@@ -79,11 +85,16 @@ Spring Boot 기반 PR 리뷰 SLA 운영 도구입니다. GitHub PR 이벤트를 
     - `409` already replayed
     - `422` legacy row without `repoId/prNumber/stage`
     - `502` replay delivery failed
+- Admin audit logs:
+  - `GET /api/admin/audit-logs?operation=SLA_REEVALUATE&limit=50`
 - Manual single-PR reevaluation:
   - `POST /api/repositories/{repositoryId}/pull-requests/{prNumber}/sla/re-evaluate`
   - Status codes:
     - `200` reevaluated
     - `404` PR state not found
+- Shared security status codes:
+  - `401` missing/invalid `X-Admin-Api-Key`
+  - `429` rate limit exceeded (`Retry-After` response header)
 
 ## Branch Protection Guide
 

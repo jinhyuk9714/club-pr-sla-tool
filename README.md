@@ -166,3 +166,4 @@ GitHub App을 직접 만들어 이 서비스에 연결해야 합니다.
 
 - `./gradlew test`
 - `./scripts/check.sh`
+

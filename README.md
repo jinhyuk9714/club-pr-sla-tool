@@ -93,3 +93,5 @@ GitHub 저장소에서 아래 설정을 권장합니다.
 - Require status checks to pass before merging
 - Required checks: `build-and-test`
 - Dismiss stale pull request approvals when new commits are pushed
+
+Dead-letter smoke test marker.

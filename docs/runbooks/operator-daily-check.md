@@ -59,7 +59,7 @@
 - stage
 - lastError
 
-재현 가능한 일시 장애로 보이면 replay를 시도합니다. 절차는 [incident-triage-replay.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/incident-triage-replay.md) 를 따릅니다.
+재현 가능한 일시 장애로 보이면 replay를 시도합니다. 절차는 [incident-triage-replay.md](incident-triage-replay.md) 를 따릅니다.
 
 ## 6. 마감 체크
 

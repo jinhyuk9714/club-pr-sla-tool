@@ -2,23 +2,29 @@
 
 ## 목표
 
-설치형 GitHub App 서비스를 `단일 앱 컨테이너 + Postgres` 형태로 private beta 운영 환경에 배포합니다.
+설치형 GitHub App 서비스를 `single VPS + Docker Compose + Caddy + Postgres` 기준으로 배포하고, 1개 팀 파일럿이 실제로 온보딩을 끝낼 수 있는 상태를 만듭니다.
 
-## 1. 필수 준비물
+## 1. VPS 준비
 
-- TLS가 적용된 공개 도메인 1개
-- Postgres 16 이상
-- GitHub App 1개
-- Discord webhook을 연결할 테스트 서버 1개
-- 환경 변수 파일 1개
+먼저 [vps-bootstrap.md](vps-bootstrap.md) 절차를 완료합니다.
 
-## 2. 환경 변수 계약
+준비물이 끝나면 아래 파일이 있어야 합니다.
 
-필수 값:
+- `docker-compose.beta.yml`
+- `Caddyfile`
+- `.env.beta`
 
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
+## 2. `.env.beta` 작성
+
+```bash
+cp .env.beta.example .env.beta
+```
+
+`.env.beta` 안의 `BETA_ENV_FILE=.env.beta` 값은 그대로 둡니다.
+
+필수로 채워야 하는 값:
+
+- `PUBLIC_HOSTNAME`
 - `GITHUB_WEBHOOK_SECRET`
 - `GITHUB_APP_APP_ID`
 - `GITHUB_APP_PRIVATE_KEY`
@@ -27,39 +33,25 @@
 - `GITHUB_APP_INSTALL_URL`
 - `APP_SECURITY_ENCRYPTION_SECRET`
 - `OPS_ADMIN_API_KEY`
-- `BETA_ALLOWED_GITHUB_LOGINS` 또는 `BETA_ALLOWED_GITHUB_ACCOUNTS`
+- `BETA_ALLOWED_GITHUB_LOGINS`
 
-선택 값:
+운영 기본값:
 
-- `SLA_SCANNER_INTERVAL_MS`
-- `SLA_SCANNER_INITIAL_DELAY_MS`
-- `OUTBOUND_JOBS_INTERVAL_MS`
-- `SLA_FALLBACK_36H_ENABLED`
-- `OPS_SECURITY_RATE_LIMIT_MAX_REQUESTS`
-- `OPS_SECURITY_RATE_LIMIT_WINDOW_SECONDS`
+- `SLA_SCANNER_INTERVAL_MS=300000`
+- `SLA_SCANNER_INITIAL_DELAY_MS=300000`
+- `OUTBOUND_JOBS_INTERVAL_MS=60000`
 
-## 3. 이미지 빌드
+## 3. 서비스 기동
 
 ```bash
-docker build -t club-pr-sla:beta .
+docker compose --env-file .env.beta -f docker-compose.beta.yml up -d --build
 ```
 
-## 4. 컨테이너 실행
+확인:
 
 ```bash
-docker run -d \
-  --name club-pr-sla \
-  --env-file .env.beta \
-  -p 8080:8080 \
-  club-pr-sla:beta
-```
-
-앱은 내부적으로 Flyway migration을 실행한 뒤 시작합니다. 별도 Redis는 필요하지 않습니다.
-
-## 5. 배포 직후 확인
-
-```bash
-curl http://<host>/api/health
+docker compose -f docker-compose.beta.yml ps
+curl https://<PUBLIC_HOSTNAME>/api/health
 ```
 
 기대 결과:
@@ -68,59 +60,64 @@ curl http://<host>/api/health
 {"status":"UP","database":"UP","migrations":"UP"}
 ```
 
-Prometheus 확인:
+## 4. GitHub App URL 설정
+
+[github-app-checklist.md](github-app-checklist.md) 기준으로 아래 URL을 맞춥니다.
+
+- Homepage URL: `https://<PUBLIC_HOSTNAME>/`
+- Callback URL: `https://<PUBLIC_HOSTNAME>/auth/github/callback`
+- Setup URL: `https://<PUBLIC_HOSTNAME>/app/installations/setup`
+- Webhook URL: `https://<PUBLIC_HOSTNAME>/api/webhooks/github`
+
+## 5. 배포 smoke test
+
+1. `https://<PUBLIC_HOSTNAME>/` 접속
+2. `GitHub App 설치`
+3. 설치 완료 후 `/app/installations/setup?installation_id=...` 복귀 확인
+4. Discord webhook 저장
+5. draft PR을 `Ready for review` 로 전환
+6. GitHub PR에서 `Club PR SLA` Check가 `On track` 인지 확인
+
+## 6. Daily ops
+
+운영자는 아래 4곳만 먼저 봅니다.
+
+- `/api/health`
+- `/ops`
+- `/ops/deliveries?status=DEAD`
+- `/ops/dead-letters?status=PENDING`
+
+자세한 점검은 [operator-daily-check.md](operator-daily-check.md) 를 따릅니다.
+
+## 7. Rollback / restore
+
+애플리케이션만 롤백할 때:
 
 ```bash
-curl -H "X-Admin-Api-Key: ${OPS_ADMIN_API_KEY}" http://<host>/actuator/prometheus
+docker compose --env-file .env.beta -f docker-compose.beta.yml down
+git checkout <previous-release-commit>
+docker compose --env-file .env.beta -f docker-compose.beta.yml up -d --build
 ```
 
-Ops UI 확인:
-
-1. `http://<host>/ops/login` 접속
-2. `OPS_ADMIN_API_KEY` 입력
-3. `/ops` overview 진입 확인
-
-## 6. GitHub App 연결 확인
-
-GitHub App 설정은 [github-app-checklist.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/github-app-checklist.md) 를 기준으로 점검합니다.
-
-최소 smoke sequence:
-
-1. 홈 `/` 접속
-2. GitHub 로그인
-3. App 설치
-4. setup redirect 확인
-5. Discord webhook 저장
-6. `ready_for_review` PR 생성
-7. GitHub Check `On track` 확인
-
-디자인 파트너 온보딩 절차는 [design-partner-onboarding-checklist.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/design-partner-onboarding-checklist.md) 를 따릅니다.
-
-## 7. 운영 중 실패 복구
-
-Dead letters 조회:
+Postgres 백업:
 
 ```bash
-curl -H "X-Admin-Api-Key: ${OPS_ADMIN_API_KEY}" \
-  "http://<host>/api/admin/dead-letters?status=PENDING&limit=20"
+docker compose -f docker-compose.beta.yml exec postgres \
+  pg_dump -U club_sla club_sla > club_sla_backup.sql
 ```
 
-Replay:
+복구:
 
 ```bash
-curl -X POST -H "X-Admin-Api-Key: ${OPS_ADMIN_API_KEY}" \
-  http://<host>/api/admin/dead-letters/<id>/replay
+docker compose -f docker-compose.beta.yml exec -T postgres \
+  psql -U club_sla -d club_sla < club_sla_backup.sql
 ```
 
-의미:
+비밀값 복구:
 
-- replay는 외부 API를 직접 다시 호출하지 않고 동일 payload로 새 outbound job을 enqueue 합니다.
-- 동일한 dedupe key가 살아 있으면 중복 job은 생성되지 않습니다.
+- `.env.beta` 를 안전한 위치에 백업합니다.
+- GitHub App private key / client secret / webhook secret / Discord webhook은 운영자가 재주입할 수 있어야 합니다.
 
-운영자가 매일 보는 체크 절차는 [operator-daily-check.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/operator-daily-check.md) 에 있고, 장애 triage와 replay 판단 기준은 [incident-triage-replay.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/incident-triage-replay.md) 에 정리했습니다.
+## 8. 디자인 파트너 온보딩
 
-## 8. 배포 제한 사항
-
-- 단일 인스턴스 전제입니다.
-- 외부 전송 큐는 DB 테이블 기반입니다.
-- Slack, 과금, 멀티 워크스페이스, 저장소별 세부 SLA는 이번 단계 범위 밖입니다.
+실제 파트너 온보딩은 [design-partner-onboarding-checklist.md](design-partner-onboarding-checklist.md) 를 따릅니다.

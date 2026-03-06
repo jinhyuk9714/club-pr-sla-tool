@@ -35,8 +35,8 @@
 
 ## Private beta prerequisites
 
-- 설치를 진행할 GitHub user login이 `BETA_ALLOWED_GITHUB_LOGINS` 에 포함되어 있거나
-- 설치 대상 account login이 `BETA_ALLOWED_GITHUB_ACCOUNTS` 에 포함되어 있어야 합니다.
+- 기본 운영은 `BETA_ALLOWED_GITHUB_LOGINS` 기준입니다.
+- account 단위 허용이 꼭 필요할 때만 `BETA_ALLOWED_GITHUB_ACCOUNTS` 를 추가합니다.
 
 ## Post-install smoke checks
 

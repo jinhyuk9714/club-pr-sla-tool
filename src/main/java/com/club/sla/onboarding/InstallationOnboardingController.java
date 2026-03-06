@@ -3,6 +3,7 @@ package com.club.sla.onboarding;
 import com.club.sla.github.GithubAuthenticatedUser;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,16 +19,20 @@ public class InstallationOnboardingController {
 
   private final GithubUserSessionService githubUserSessionService;
   private final InstallationOnboardingService installationOnboardingService;
+  private final String installUrl;
 
   public InstallationOnboardingController(
       GithubUserSessionService githubUserSessionService,
-      InstallationOnboardingService installationOnboardingService) {
+      InstallationOnboardingService installationOnboardingService,
+      @Value("${github.app.install-url:https://github.com/apps/club-pr-sla/installations/new}")
+          String installUrl) {
     this.githubUserSessionService = githubUserSessionService;
     this.installationOnboardingService = installationOnboardingService;
+    this.installUrl = installUrl;
   }
 
   @GetMapping("/app/installations/setup")
-  public RedirectView setup(@RequestParam("installation_id") Long installationId) {
+  public Object setup(@RequestParam("installation_id") Long installationId, Model model) {
     GithubAuthenticatedUser authenticatedUser = githubUserSessionService.currentUser().orElse(null);
     if (authenticatedUser == null) {
       return new RedirectView(
@@ -35,7 +40,13 @@ public class InstallationOnboardingController {
     }
     if (!installationOnboardingService.userCanAccessInstallation(
         authenticatedUser, installationId)) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+      model.addAttribute("title", "설치 설정을 계속할 수 없습니다");
+      model.addAttribute("message", "설치 권한을 다시 확인한 뒤 로그인부터 다시 시도하세요.");
+      model.addAttribute(
+          "loginUrl",
+          loginRedirectFor("/app/installations/setup?installation_id=" + installationId));
+      model.addAttribute("installUrl", installUrl);
+      return "onboarding-error";
     }
     return new RedirectView("/app/installations/" + installationId);
   }

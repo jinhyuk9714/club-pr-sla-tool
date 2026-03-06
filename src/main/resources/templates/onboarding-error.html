@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title th:text="${title}">Onboarding Error</title>
+  </head>
+  <body>
+    <main>
+      <h1 th:text="${title}">Onboarding Error</h1>
+      <p th:text="${message}">Onboarding failed.</p>
+      <p>
+        <a th:href="${installUrl}">GitHub App 설치로 이동</a>
+      </p>
+      <p>
+        <a th:href="${loginUrl}">GitHub 로그인 다시 시도</a>
+      </p>
+    </main>
+  </body>
+</html>

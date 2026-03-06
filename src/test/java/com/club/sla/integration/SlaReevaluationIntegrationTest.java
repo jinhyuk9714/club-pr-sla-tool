@@ -4,6 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
+import com.club.sla.delivery.OutboundDeliveryJobWorker;
+import com.club.sla.installation.GithubInstallationAccountType;
+import com.club.sla.installation.GithubInstallationRepositoryEntryUpsertCommand;
+import com.club.sla.installation.GithubInstallationUpsertCommand;
+import com.club.sla.installation.InstallationRegistryService;
+import com.club.sla.installation.InstallationSettingsUpdateCommand;
 import com.club.sla.notify.NotificationPort;
 import com.club.sla.pr.PullRequestState;
 import com.club.sla.pr.PullRequestStateRepository;
@@ -48,6 +54,8 @@ class SlaReevaluationIntegrationTest {
   @Autowired private PullRequestStateRepository pullRequestStateRepository;
   @Autowired private SlaEventLogRepository slaEventLogRepository;
   @Autowired private SlaReevaluationService slaReevaluationService;
+  @Autowired private InstallationRegistryService installationRegistryService;
+  @Autowired private OutboundDeliveryJobWorker outboundDeliveryJobWorker;
 
   @MockBean private NotificationPort notificationPort;
 
@@ -59,12 +67,14 @@ class SlaReevaluationIntegrationTest {
 
   @Test
   void dispatchesActionAndWritesSlaLogWhenThresholdReached() {
+    configureRepositoryTracking(7101L, 7001L);
     PullRequestState state = new PullRequestState(7001L, 42L, "alice");
     state.setStatus(PullRequestStatus.READY);
     state.setReadyAt(Instant.now().minus(13, ChronoUnit.HOURS));
     pullRequestStateRepository.saveAndFlush(state);
 
     SlaReevaluationResultDto result = slaReevaluationService.reevaluate(7001L, 42L);
+    outboundDeliveryJobWorker.processPendingJobs();
 
     assertThat(result.actionDispatched()).isTrue();
     assertThat(result.action()).isEqualTo(SlaAction.REMIND_12H);
@@ -78,6 +88,7 @@ class SlaReevaluationIntegrationTest {
 
   @Test
   void returnsAlreadySentWhenStageWasAlreadyLogged() {
+    configureRepositoryTracking(7102L, 7002L);
     PullRequestState state = new PullRequestState(7002L, 43L, "alice");
     state.setStatus(PullRequestStatus.READY);
     state.setReadyAt(Instant.now().minus(13, ChronoUnit.HOURS));
@@ -89,5 +100,23 @@ class SlaReevaluationIntegrationTest {
 
     assertThat(result.actionDispatched()).isFalse();
     assertThat(result.reason()).isEqualTo("ALREADY_SENT");
+  }
+
+  private void configureRepositoryTracking(Long installationId, Long repositoryId) {
+    installationRegistryService.upsertInstallation(
+        new GithubInstallationUpsertCommand(
+            installationId,
+            9000L + installationId,
+            "club-org",
+            GithubInstallationAccountType.ORGANIZATION,
+            Instant.parse("2026-03-05T00:00:00Z")));
+    installationRegistryService.syncRepositories(
+        installationId,
+        java.util.List.of(
+            new GithubInstallationRepositoryEntryUpsertCommand(
+                repositoryId, "tracked-repo", "club-org/tracked-repo")));
+    installationRegistryService.saveSettings(
+        installationId,
+        new InstallationSettingsUpdateCommand("https://discord.example/webhook", true));
   }
 }

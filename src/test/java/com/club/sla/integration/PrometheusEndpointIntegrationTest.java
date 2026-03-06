@@ -40,7 +40,6 @@ class PrometheusEndpointIntegrationTest {
     ResponseEntity<String> response =
         restTemplate.getForEntity("/actuator/prometheus", String.class);
 
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(response.getBody()).contains("# HELP");
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
   }
 }

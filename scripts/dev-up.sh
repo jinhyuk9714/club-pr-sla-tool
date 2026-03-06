@@ -4,6 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-docker compose up -d postgres redis
+docker compose up -d postgres
 
-echo "Local infra is up (postgres, redis)."
+echo "Local infra is up (postgres)."

@@ -1,5 +1,6 @@
 package com.club.sla.sla;
 
+import com.club.sla.installation.InstallationTrackingService;
 import com.club.sla.notify.NotificationMessage;
 import com.club.sla.notify.SlaNotificationService;
 import com.club.sla.pr.PullRequestState;
@@ -23,6 +24,7 @@ public class SlaReevaluationService {
   private final PullRequestStateRepository pullRequestStateRepository;
   private final SlaEventLogRepository slaEventLogRepository;
   private final SlaNotificationService slaNotificationService;
+  private final InstallationTrackingService installationTrackingService;
   private final SlaEngine slaEngine = new SlaEngine();
   private final Clock clock;
 
@@ -33,11 +35,13 @@ public class SlaReevaluationService {
   public SlaReevaluationService(
       PullRequestStateRepository pullRequestStateRepository,
       SlaEventLogRepository slaEventLogRepository,
-      SlaNotificationService slaNotificationService) {
+      SlaNotificationService slaNotificationService,
+      InstallationTrackingService installationTrackingService) {
     this(
         pullRequestStateRepository,
         slaEventLogRepository,
         slaNotificationService,
+        installationTrackingService,
         Clock.systemUTC());
   }
 
@@ -45,10 +49,12 @@ public class SlaReevaluationService {
       PullRequestStateRepository pullRequestStateRepository,
       SlaEventLogRepository slaEventLogRepository,
       SlaNotificationService slaNotificationService,
+      InstallationTrackingService installationTrackingService,
       Clock clock) {
     this.pullRequestStateRepository = pullRequestStateRepository;
     this.slaEventLogRepository = slaEventLogRepository;
     this.slaNotificationService = slaNotificationService;
+    this.installationTrackingService = installationTrackingService;
     this.clock = Objects.requireNonNull(clock, "clock");
   }
 
@@ -62,6 +68,9 @@ public class SlaReevaluationService {
     }
 
     PullRequestState state = maybeState.get();
+    if (!installationTrackingService.isRepositoryConfigured(repositoryId)) {
+      return new SlaReevaluationResultDto(false, null, "REPOSITORY_NOT_TRACKED", now);
+    }
     if (state.getFirstReviewAt() != null) {
       return new SlaReevaluationResultDto(false, null, "ALREADY_REVIEWED", now);
     }

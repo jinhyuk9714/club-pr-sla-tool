@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ops Login</title>
+  </head>
+  <body>
+    <main>
+      <h1>Ops Login</h1>
+      <p th:if="${error}" th:text="${error}">error</p>
+      <p th:if="${successMessage}" th:text="${successMessage}">success</p>
+      <form th:action="@{/ops/login}" method="post">
+        <label for="adminApiKey">Admin API key</label>
+        <input id="adminApiKey" name="adminApiKey" type="password" />
+        <button type="submit">Open ops session</button>
+      </form>
+    </main>
+  </body>
+</html>

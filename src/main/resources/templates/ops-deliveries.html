@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ops Deliveries</title>
+  </head>
+  <body>
+    <main>
+      <nav>
+        <a th:href="@{/ops}">Overview</a>
+        <a th:href="@{/ops/installations}">Installations</a>
+        <a th:href="@{/ops/deliveries}">Deliveries</a>
+        <a th:href="@{/ops/dead-letters}">Dead letters</a>
+      </nav>
+      <h1>Outbound Deliveries</h1>
+      <form th:action="@{/ops/deliveries}" method="get">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="">All</option>
+          <option
+              th:each="statusValue : ${availableStatuses}"
+              th:selected="${statusValue == selectedStatus}"
+              th:text="${statusValue}"
+              th:value="${statusValue}">
+            status
+          </option>
+        </select>
+        <label for="jobType">Job type</label>
+        <select id="jobType" name="jobType">
+          <option value="">All</option>
+          <option
+              th:each="jobTypeValue : ${availableJobTypes}"
+              th:selected="${jobTypeValue == selectedJobType}"
+              th:text="${jobTypeValue}"
+              th:value="${jobTypeValue}">
+            type
+          </option>
+        </select>
+        <label for="installationId">Installation</label>
+        <input id="installationId" name="installationId" th:value="${selectedInstallationId}" type="number" />
+        <button type="submit">Filter</button>
+      </form>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Installation</th>
+            <th>Repository</th>
+            <th>PR</th>
+            <th>Attempts</th>
+            <th>Next attempt</th>
+            <th>Last error</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="delivery : ${deliveries}">
+            <td th:text="${delivery.id()}">1</td>
+            <td th:text="${delivery.jobType()}">DISCORD_NOTIFICATION</td>
+            <td th:text="${delivery.status()}">PENDING</td>
+            <td th:text="${delivery.installationId()}">7001</td>
+            <td th:text="${delivery.repositoryId()}">9001</td>
+            <td th:text="${delivery.prNumber()}">17</td>
+            <td th:text="${delivery.attemptCount()}">1</td>
+            <td th:text="${delivery.nextAttemptAt()}">next</td>
+            <td th:text="${delivery.lastError()}">error</td>
+            <td th:text="${delivery.createdAt()}">created</td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </body>
+</html>

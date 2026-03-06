@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ops Dead Letters</title>
+  </head>
+  <body>
+    <main>
+      <nav>
+        <a th:href="@{/ops}">Overview</a>
+        <a th:href="@{/ops/installations}">Installations</a>
+        <a th:href="@{/ops/deliveries}">Deliveries</a>
+        <a th:href="@{/ops/dead-letters}">Dead letters</a>
+      </nav>
+      <h1>Dead Letters</h1>
+      <p th:if="${successMessage}" th:text="${successMessage}">success</p>
+      <p th:if="${errorMessage}" th:text="${errorMessage}">error</p>
+      <form th:action="@{/ops/dead-letters}" method="get">
+        <label for="status">Replay status</label>
+        <select id="status" name="status">
+          <option
+              th:each="statusValue : ${availableStatuses}"
+              th:selected="${statusValue == selectedStatus}"
+              th:text="${statusValue}"
+              th:value="${statusValue}">
+            status
+          </option>
+        </select>
+        <button type="submit">Filter</button>
+      </form>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Reason</th>
+            <th>Repository</th>
+            <th>PR</th>
+            <th>Stage</th>
+            <th>Replay status</th>
+            <th>Attempts</th>
+            <th>Last error</th>
+            <th>Created</th>
+            <th>Replayed</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="deadLetter : ${deadLetters}">
+            <td th:text="${deadLetter.id()}">10</td>
+            <td th:text="${deadLetter.reason()}">reason</td>
+            <td th:text="${deadLetter.repoId()}">9001</td>
+            <td th:text="${deadLetter.prNumber()}">17</td>
+            <td th:text="${deadLetter.stage()}">REMIND_12H</td>
+            <td th:text="${deadLetter.replayStatus()}">PENDING</td>
+            <td th:text="${deadLetter.replayAttempts()}">0</td>
+            <td th:text="${deadLetter.lastError()}">last error</td>
+            <td th:text="${deadLetter.createdAt()}">created</td>
+            <td th:text="${deadLetter.replayedAt()}">replayed</td>
+            <td>
+              <form
+                  th:action="@{/ops/dead-letters/{id}/replay(id=${deadLetter.id()})}"
+                  method="post">
+                <input name="status" th:value="${selectedStatus}" type="hidden" />
+                <button type="submit">Replay</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </body>
+</html>

@@ -2,6 +2,12 @@ package com.club.sla.e2e;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.club.sla.delivery.OutboundDeliveryJobWorker;
+import com.club.sla.installation.GithubInstallationAccountType;
+import com.club.sla.installation.GithubInstallationRepositoryEntryUpsertCommand;
+import com.club.sla.installation.GithubInstallationUpsertCommand;
+import com.club.sla.installation.InstallationRegistryService;
+import com.club.sla.installation.InstallationSettingsUpdateCommand;
 import com.club.sla.notify.NotificationMessage;
 import com.club.sla.pr.PullRequestState;
 import com.club.sla.pr.PullRequestStateRepository;
@@ -51,6 +57,8 @@ class SlaFlowE2ETest {
   @Autowired private PullRequestStateRepository pullRequestStateRepository;
   @Autowired private SlaEventLogRepository slaEventLogRepository;
   @Autowired private SlaScannerJob slaScannerJob;
+  @Autowired private OutboundDeliveryJobWorker outboundDeliveryJobWorker;
+  @Autowired private InstallationRegistryService installationRegistryService;
   @Autowired private MeterRegistry meterRegistry;
   @Autowired private TestNotificationPortConfig.RecordingNotificationPort recordingNotificationPort;
 
@@ -63,17 +71,20 @@ class SlaFlowE2ETest {
 
   @Test
   void readyToReviewFlowTriggersReminderEscalationAndStopsAfterReview() {
+    configureRepositoryTracking(7001L, 9001L);
     PullRequestState state = new PullRequestState(9001L, 77L, "alice");
     state.setStatus(PullRequestStatus.READY);
     state.setReadyAt(Instant.now().minusSeconds(13 * 3600));
     pullRequestStateRepository.saveAndFlush(state);
 
     slaScannerJob.scan();
+    outboundDeliveryJobWorker.processPendingJobs();
     assertThat(recordingNotificationPort.allMessages())
         .containsExactly(new NotificationMessage(9001L, 77L, SlaAction.REMIND_12H));
     assertThat(slaEventLogRepository.count()).isEqualTo(1);
 
     slaScannerJob.scan();
+    outboundDeliveryJobWorker.processPendingJobs();
     assertThat(recordingNotificationPort.allMessages()).hasSize(1);
     assertThat(slaEventLogRepository.count()).isEqualTo(1);
 
@@ -83,6 +94,7 @@ class SlaFlowE2ETest {
     pullRequestStateRepository.saveAndFlush(updated);
 
     slaScannerJob.scan();
+    outboundDeliveryJobWorker.processPendingJobs();
     assertThat(recordingNotificationPort.allMessages())
         .containsExactly(
             new NotificationMessage(9001L, 77L, SlaAction.REMIND_12H),
@@ -94,6 +106,7 @@ class SlaFlowE2ETest {
     pullRequestStateRepository.saveAndFlush(updated);
 
     slaScannerJob.scan();
+    outboundDeliveryJobWorker.processPendingJobs();
     assertThat(recordingNotificationPort.allMessages()).hasSize(2);
     assertThat(slaEventLogRepository.count()).isEqualTo(2);
 
@@ -104,5 +117,23 @@ class SlaFlowE2ETest {
 
   private double counter(String name, String... tags) {
     return meterRegistry.get(name).tags(tags).counter().count();
+  }
+
+  private void configureRepositoryTracking(Long installationId, Long repositoryId) {
+    installationRegistryService.upsertInstallation(
+        new GithubInstallationUpsertCommand(
+            installationId,
+            8100L,
+            "club-org",
+            GithubInstallationAccountType.ORGANIZATION,
+            Instant.parse("2026-03-05T00:00:00Z")));
+    installationRegistryService.syncRepositories(
+        installationId,
+        java.util.List.of(
+            new GithubInstallationRepositoryEntryUpsertCommand(
+                repositoryId, "club-pr-tool", "club-org/club-pr-tool")));
+    installationRegistryService.saveSettings(
+        installationId,
+        new InstallationSettingsUpdateCommand("https://discord.example/webhook", true));
   }
 }

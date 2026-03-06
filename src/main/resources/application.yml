@@ -13,10 +13,6 @@ spring:
         format_sql: true
   flyway:
     enabled: true
-  data:
-    redis:
-      host: ${SPRING_REDIS_HOST:localhost}
-      port: ${SPRING_REDIS_PORT:6379}
 
 management:
   prometheus:
@@ -32,16 +28,21 @@ github:
   webhook:
     secret: ${GITHUB_WEBHOOK_SECRET:}
 
-discord:
-  webhook:
-    url: ${DISCORD_WEBHOOK_URL:}
-
 sla:
   policy:
     fallback-36h-enabled: ${SLA_FALLBACK_36H_ENABLED:false}
   scanner:
     interval-ms: ${SLA_SCANNER_INTERVAL_MS:300000}
     initial-delay-ms: ${SLA_SCANNER_INITIAL_DELAY_MS:300000}
+
+outbound:
+  jobs:
+    interval-ms: ${OUTBOUND_JOBS_INTERVAL_MS:60000}
+
+beta:
+  access:
+    allowed-logins: ${BETA_ALLOWED_GITHUB_LOGINS:}
+    allowed-accounts: ${BETA_ALLOWED_GITHUB_ACCOUNTS:}
 
 ops:
   security:

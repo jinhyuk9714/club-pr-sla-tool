@@ -17,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class OpsApiKeyFilter extends OncePerRequestFilter {
 
   private static final String HEADER_NAME = "X-Admin-Api-Key";
+  private static final String PROMETHEUS_PATH = "/actuator/prometheus";
   private static final Pattern MANUAL_REEVALUATE_PATH =
       Pattern.compile("^/api/repositories/[^/]+/pull-requests/[^/]+/sla/re-evaluate$");
   private static final Pattern DEAD_LETTER_REPLAY_PATH =
@@ -73,6 +74,9 @@ public class OpsApiKeyFilter extends OncePerRequestFilter {
     if (requestUri.startsWith("/api/admin/")) {
       return "GET".equals(method) || "POST".equals(method);
     }
+    if (PROMETHEUS_PATH.equals(requestUri)) {
+      return "GET".equals(method);
+    }
     return "POST".equals(method) && MANUAL_REEVALUATE_PATH.matcher(requestUri).matches();
   }
 
@@ -101,6 +105,9 @@ public class OpsApiKeyFilter extends OncePerRequestFilter {
     }
     if (MANUAL_REEVALUATE_PATH.matcher(requestUri).matches()) {
       return "manual_reevaluate";
+    }
+    if (PROMETHEUS_PATH.equals(requestUri)) {
+      return "prometheus";
     }
     return "ops_unknown";
   }

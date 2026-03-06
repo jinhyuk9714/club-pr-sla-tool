@@ -6,35 +6,32 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import com.club.sla.notify.DeadLetterEvent;
-import com.club.sla.notify.DeadLetterRepository;
+import com.club.sla.installation.InstallationTrackingService;
 import com.club.sla.notify.NotificationMessage;
 import com.club.sla.sla.SlaAction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class DiscordNotificationAdapterTest {
 
   @Mock private DiscordWebhookClient discordWebhookClient;
 
-  @Mock private DeadLetterRepository deadLetterRepository;
+  @Mock private InstallationTrackingService installationTrackingService;
 
   @InjectMocks private DiscordNotificationAdapter discordNotificationAdapter;
 
   @Test
-  void doesNotStoreDeadLetterWhenFirstAttemptSucceeds() {
-    ReflectionTestUtils.setField(
-        discordNotificationAdapter, "webhookUrl", "https://discord.example/webhook");
+  void usesConfiguredInstallationWebhookWhenFirstAttemptSucceeds() {
     NotificationMessage message = new NotificationMessage(10L, 100L, SlaAction.REMIND_12H);
+    when(installationTrackingService.findConfiguredDiscordWebhook(10L))
+        .thenReturn(java.util.Optional.of("https://discord.example/webhook"));
 
     doNothing()
         .when(discordWebhookClient)
@@ -42,16 +39,15 @@ class DiscordNotificationAdapterTest {
 
     discordNotificationAdapter.send(message);
 
-    verify(discordWebhookClient, times(1))
+    verify(discordWebhookClient)
         .post(anyString(), any(DiscordWebhookClient.DiscordWebhookPayload.class));
-    verify(deadLetterRepository, never()).save(any(DeadLetterEvent.class));
   }
 
   @Test
-  void storesDeadLetterAndThrowsWhenThreeAttemptsFail() {
-    ReflectionTestUtils.setField(
-        discordNotificationAdapter, "webhookUrl", "https://discord.example/webhook");
+  void throwsImmediatelyWhenWebhookPostFails() {
     NotificationMessage message = new NotificationMessage(10L, 101L, SlaAction.ESCALATE_24H);
+    when(installationTrackingService.findConfiguredDiscordWebhook(10L))
+        .thenReturn(java.util.Optional.of("https://discord.example/webhook"));
 
     doThrow(new RuntimeException("boom"))
         .when(discordWebhookClient)
@@ -60,34 +56,21 @@ class DiscordNotificationAdapterTest {
     assertThatThrownBy(() -> discordNotificationAdapter.send(message))
         .isInstanceOf(RuntimeException.class);
 
-    verify(discordWebhookClient, times(3))
+    verify(discordWebhookClient)
         .post(anyString(), any(DiscordWebhookClient.DiscordWebhookPayload.class));
-    ArgumentCaptor<DeadLetterEvent> deadLetterCaptor =
-        ArgumentCaptor.forClass(DeadLetterEvent.class);
-    verify(deadLetterRepository, times(1)).save(deadLetterCaptor.capture());
-    DeadLetterEvent deadLetterEvent = deadLetterCaptor.getValue();
-    org.assertj.core.api.Assertions.assertThat(deadLetterEvent.getRepoId()).isEqualTo(10L);
-    org.assertj.core.api.Assertions.assertThat(deadLetterEvent.getPrNumber()).isEqualTo(101L);
-    org.assertj.core.api.Assertions.assertThat(deadLetterEvent.getStage())
-        .isEqualTo(SlaAction.ESCALATE_24H);
   }
 
   @Test
-  void doesNotStoreDeadLetterWhenThirdAttemptSucceeds() {
-    ReflectionTestUtils.setField(
-        discordNotificationAdapter, "webhookUrl", "https://discord.example/webhook");
-    NotificationMessage message = new NotificationMessage(10L, 102L, SlaAction.FALLBACK_36H);
+  void throwsWhenRepositoryHasNoConfiguredWebhook() {
+    NotificationMessage message = new NotificationMessage(10L, 103L, SlaAction.REMIND_12H);
+    when(installationTrackingService.findConfiguredDiscordWebhook(10L))
+        .thenReturn(java.util.Optional.empty());
 
-    doThrow(new RuntimeException("boom-1"))
-        .doThrow(new RuntimeException("boom-2"))
-        .doNothing()
-        .when(discordWebhookClient)
+    assertThatThrownBy(() -> discordNotificationAdapter.send(message))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("No configured Discord webhook");
+
+    verify(discordWebhookClient, never())
         .post(anyString(), any(DiscordWebhookClient.DiscordWebhookPayload.class));
-
-    discordNotificationAdapter.send(message);
-
-    verify(discordWebhookClient, times(3))
-        .post(anyString(), any(DiscordWebhookClient.DiscordWebhookPayload.class));
-    verify(deadLetterRepository, never()).save(any(DeadLetterEvent.class));
   }
 }

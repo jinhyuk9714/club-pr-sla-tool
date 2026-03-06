@@ -1,5 +1,6 @@
 package com.club.sla.notify;
 
+import com.club.sla.delivery.OutboundDeliveryJobService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -13,21 +14,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class DeadLetterReplayService {
 
   private final DeadLetterRepository deadLetterRepository;
-  private final SlaNotificationService slaNotificationService;
+  private final OutboundDeliveryJobService outboundDeliveryJobService;
   private final Clock clock;
 
   @Autowired
   public DeadLetterReplayService(
-      DeadLetterRepository deadLetterRepository, SlaNotificationService slaNotificationService) {
-    this(deadLetterRepository, slaNotificationService, Clock.systemUTC());
+      DeadLetterRepository deadLetterRepository,
+      OutboundDeliveryJobService outboundDeliveryJobService) {
+    this(deadLetterRepository, outboundDeliveryJobService, Clock.systemUTC());
   }
 
   DeadLetterReplayService(
       DeadLetterRepository deadLetterRepository,
-      SlaNotificationService slaNotificationService,
+      OutboundDeliveryJobService outboundDeliveryJobService,
       Clock clock) {
     this.deadLetterRepository = deadLetterRepository;
-    this.slaNotificationService = slaNotificationService;
+    this.outboundDeliveryJobService = outboundDeliveryJobService;
     this.clock = Objects.requireNonNull(clock, "clock");
   }
 
@@ -51,13 +53,18 @@ public class DeadLetterReplayService {
     if (event.getReplayStatus() == DeadLetterReplayStatus.REPLAYED) {
       throw new DeadLetterAlreadyReplayedException(deadLetterId);
     }
-    if (event.getRepoId() == null || event.getPrNumber() == null || event.getStage() == null) {
+    if (event.getJobType() == null
+        && (event.getRepoId() == null || event.getPrNumber() == null || event.getStage() == null)) {
       throw new DeadLetterLegacyMetadataMissingException(deadLetterId);
     }
 
     try {
-      slaNotificationService.dispatch(
-          new NotificationMessage(event.getRepoId(), event.getPrNumber(), event.getStage()));
+      if (event.getJobType() != null) {
+        outboundDeliveryJobService.enqueueReplay(event.getJobType(), event.getPayload());
+      } else {
+        outboundDeliveryJobService.enqueueDiscordNotification(
+            new NotificationMessage(event.getRepoId(), event.getPrNumber(), event.getStage()));
+      }
       event.markReplaySucceeded(Instant.now(clock));
       DeadLetterEvent saved = deadLetterRepository.save(event);
       return toReplayResultDto(saved);

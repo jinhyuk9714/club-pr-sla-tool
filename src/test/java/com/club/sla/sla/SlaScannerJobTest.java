@@ -8,6 +8,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.club.sla.github.GithubPullRequestCheckService;
+import com.club.sla.github.GithubPullRequestCheckState;
+import com.club.sla.installation.InstallationTrackingService;
 import com.club.sla.metrics.SlaMetrics;
 import com.club.sla.notify.NotificationMessage;
 import com.club.sla.notify.SlaNotificationService;
@@ -32,6 +35,8 @@ class SlaScannerJobTest {
   @Mock private SlaEventLogRepository slaEventLogRepository;
   @Mock private SlaNotificationService slaNotificationService;
   @Mock private SlaMetrics slaMetrics;
+  @Mock private InstallationTrackingService installationTrackingService;
+  @Mock private GithubPullRequestCheckService githubPullRequestCheckService;
 
   @InjectMocks private SlaScannerJob slaScannerJob;
 
@@ -54,15 +59,19 @@ class SlaScannerJobTest {
 
     PullRequestState pullRequest =
         readyPullRequest(1L, 101L, Instant.now().minus(Duration.ofHours(13)));
+    pullRequest.setHeadSha("head-101");
     when(pullRequestStateRepository.findByStatusAndReadyAtIsNotNullAndFirstReviewAtIsNull(
             PullRequestStatus.READY))
         .thenReturn(List.of(pullRequest));
     when(slaEventLogRepository.findByRepoIdAndPrNumber(1L, 101L)).thenReturn(List.of());
+    when(installationTrackingService.isRepositoryConfigured(1L)).thenReturn(true);
 
     slaScannerJob.scan();
 
     verify(slaNotificationService, times(1))
         .dispatch(eq(new NotificationMessage(1L, 101L, SlaAction.REMIND_12H)));
+    verify(githubPullRequestCheckService)
+        .syncStatus(1L, 101L, "head-101", GithubPullRequestCheckState.AT_RISK);
     verify(schedulerLockService, times(1)).unlock("sla-scan");
     verify(slaMetrics, times(1)).incrementScanRun();
   }
@@ -78,6 +87,7 @@ class SlaScannerJobTest {
         .thenReturn(List.of(pullRequest));
     when(slaEventLogRepository.findByRepoIdAndPrNumber(2L, 201L))
         .thenReturn(List.of(new SlaEventLog(2L, 201L, SlaAction.REMIND_12H, Instant.now())));
+    when(installationTrackingService.isRepositoryConfigured(2L)).thenReturn(true);
 
     slaScannerJob.scan();
 
@@ -97,6 +107,7 @@ class SlaScannerJobTest {
             PullRequestStatus.READY))
         .thenReturn(List.of(pullRequest));
     when(slaEventLogRepository.findByRepoIdAndPrNumber(3L, 301L)).thenReturn(List.of());
+    when(installationTrackingService.isRepositoryConfigured(3L)).thenReturn(true);
 
     slaScannerJob.scan();
 
@@ -111,11 +122,14 @@ class SlaScannerJobTest {
 
     PullRequestState first = readyPullRequest(4L, 401L, Instant.now().minus(Duration.ofHours(13)));
     PullRequestState second = readyPullRequest(4L, 402L, Instant.now().minus(Duration.ofHours(25)));
+    first.setHeadSha("head-401");
+    second.setHeadSha("head-402");
     when(pullRequestStateRepository.findByStatusAndReadyAtIsNotNullAndFirstReviewAtIsNull(
             PullRequestStatus.READY))
         .thenReturn(List.of(first, second));
     when(slaEventLogRepository.findByRepoIdAndPrNumber(4L, 401L)).thenReturn(List.of());
     when(slaEventLogRepository.findByRepoIdAndPrNumber(4L, 402L)).thenReturn(List.of());
+    when(installationTrackingService.isRepositoryConfigured(4L)).thenReturn(true);
     doThrow(new RuntimeException("dispatch failed"))
         .doNothing()
         .when(slaNotificationService)
@@ -144,6 +158,23 @@ class SlaScannerJobTest {
     verify(schedulerLockService, times(1)).unlock("sla-scan");
     verify(slaMetrics, times(1)).incrementScanRun();
     verify(slaMetrics, times(1)).incrementScanFailure();
+  }
+
+  @Test
+  void skipsRepositoryWhenInstallationIsNotConfigured() {
+    when(schedulerLockService.tryLock("sla-scan")).thenReturn(true);
+
+    PullRequestState pullRequest =
+        readyPullRequest(5L, 501L, Instant.now().minus(Duration.ofHours(13)));
+    when(pullRequestStateRepository.findByStatusAndReadyAtIsNotNullAndFirstReviewAtIsNull(
+            PullRequestStatus.READY))
+        .thenReturn(List.of(pullRequest));
+    when(installationTrackingService.isRepositoryConfigured(5L)).thenReturn(false);
+
+    slaScannerJob.scan();
+
+    verify(slaNotificationService, never()).dispatch(any(NotificationMessage.class));
+    verify(githubPullRequestCheckService, never()).syncStatus(eq(5L), eq(501L), any(), any());
   }
 
   private PullRequestState readyPullRequest(Long repoId, Long prNumber, Instant readyAt) {

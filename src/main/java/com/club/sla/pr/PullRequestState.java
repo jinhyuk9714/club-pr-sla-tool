@@ -47,6 +47,9 @@ public class PullRequestState {
   @Column(name = "first_review_at")
   private Instant firstReviewAt;
 
+  @Column(name = "head_sha")
+  private String headSha;
+
   protected PullRequestState() {}
 
   public PullRequestState(Long repositoryId, Long prNumber, String authorLogin) {
@@ -106,5 +109,13 @@ public class PullRequestState {
 
   public void setFirstReviewAt(Instant firstReviewAt) {
     this.firstReviewAt = firstReviewAt;
+  }
+
+  public String getHeadSha() {
+    return headSha;
+  }
+
+  public void setHeadSha(String headSha) {
+    this.headSha = headSha;
   }
 }

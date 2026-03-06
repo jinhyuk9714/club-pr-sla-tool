@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.club.sla.installation.InstallationTrackingService;
 import com.club.sla.pr.PullRequestState;
 import com.club.sla.pr.PullRequestStateRepository;
 import com.club.sla.pr.PullRequestStatus;
@@ -20,23 +21,28 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DashboardQueryServiceTest {
 
   @Mock private PullRequestStateRepository pullRequestStateRepository;
+  @Mock private InstallationTrackingService installationTrackingService;
 
   @Test
   void classifiesDashboardBucketsWithBoundaries() {
     Instant now = Instant.parse("2026-03-05T12:00:00Z");
     DashboardQueryService dashboardQueryService =
-        new DashboardQueryService(pullRequestStateRepository, Clock.fixed(now, ZoneOffset.UTC));
+        new DashboardQueryService(
+            pullRequestStateRepository,
+            installationTrackingService,
+            Clock.fixed(now, ZoneOffset.UTC));
 
     PullRequestState onTrack = readyState(1L, now.minusSeconds(11 * 3600 + 59 * 60), null);
     PullRequestState atRiskAt12h = readyState(2L, now.minusSeconds(12 * 3600), null);
     PullRequestState atRiskAt2359 = readyState(3L, now.minusSeconds(23 * 3600 + 59 * 60), null);
     PullRequestState breachedAt24h = readyState(4L, now.minusSeconds(24 * 3600), null);
     PullRequestState reviewed = readyState(5L, now.minusSeconds(72 * 3600), now.minusSeconds(10));
-    PullRequestState nullReadyAt = readyState(6L, null, null);
+    PullRequestState draft = readyState(6L, now.minusSeconds(13 * 3600), null);
+    draft.setStatus(PullRequestStatus.DRAFT);
 
     when(pullRequestStateRepository.findByRepositoryIdAndReadyAtIsNotNull(9001L))
-        .thenReturn(
-            List.of(onTrack, atRiskAt12h, atRiskAt2359, breachedAt24h, reviewed, nullReadyAt));
+        .thenReturn(List.of(onTrack, atRiskAt12h, atRiskAt2359, breachedAt24h, reviewed, draft));
+    when(installationTrackingService.isRepositoryActive(9001L)).thenReturn(true);
 
     DashboardSummaryDto summary = dashboardQueryService.fetch(9001L);
 
@@ -44,6 +50,22 @@ class DashboardQueryServiceTest {
     assertThat(summary.atRisk()).isEqualTo(2);
     assertThat(summary.breached()).isEqualTo(1);
     verify(pullRequestStateRepository).findByRepositoryIdAndReadyAtIsNotNull(9001L);
+  }
+
+  @Test
+  void returnsZerosForInactiveRepository() {
+    DashboardQueryService dashboardQueryService =
+        new DashboardQueryService(
+            pullRequestStateRepository,
+            installationTrackingService,
+            Clock.fixed(Instant.parse("2026-03-05T12:00:00Z"), ZoneOffset.UTC));
+    when(installationTrackingService.isRepositoryActive(9002L)).thenReturn(false);
+
+    DashboardSummaryDto summary = dashboardQueryService.fetch(9002L);
+
+    assertThat(summary.onTrack()).isZero();
+    assertThat(summary.atRisk()).isZero();
+    assertThat(summary.breached()).isZero();
   }
 
   private PullRequestState readyState(Long prNumber, Instant readyAt, Instant firstReviewAt) {

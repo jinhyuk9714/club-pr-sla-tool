@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ops Overview</title>
+  </head>
+  <body>
+    <main>
+      <nav>
+        <a th:href="@{/ops}">Overview</a>
+        <a th:href="@{/ops/installations}">Installations</a>
+        <a th:href="@{/ops/deliveries}">Deliveries</a>
+        <a th:href="@{/ops/dead-letters}">Dead letters</a>
+        <form th:action="@{/ops/logout}" method="post">
+          <button type="submit">Logout</button>
+        </form>
+      </nav>
+      <h1>Ops Overview</h1>
+      <p th:if="${successMessage}" th:text="${successMessage}">success</p>
+      <ul>
+        <li>Active installations: <span th:text="${overview.activeInstallations()}">0</span></li>
+        <li>Configured installations: <span th:text="${overview.configuredInstallations()}">0</span></li>
+        <li>Misconfigured installations: <span th:text="${overview.misconfiguredInstallations()}">0</span></li>
+        <li>Pending outbound jobs: <span th:text="${overview.pendingOutboundJobs()}">0</span></li>
+        <li>Dead outbound jobs: <span th:text="${overview.deadOutboundJobs()}">0</span></li>
+        <li>Pending dead letters: <span th:text="${overview.pendingDeadLetters()}">0</span></li>
+      </ul>
+    </main>
+  </body>
+</html>

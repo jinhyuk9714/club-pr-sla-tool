@@ -101,4 +101,13 @@ class OpsApiKeyFilterIntegrationTest {
   void keepsWebhookEndpointOutsideAdminApiKeyProtection() throws Exception {
     mockMvc.perform(post("/api/webhooks/github")).andExpect(status().isBadRequest());
   }
+
+  @Test
+  void protectsPrometheusEndpointWithAdminApiKey() throws Exception {
+    mockMvc.perform(get("/actuator/prometheus")).andExpect(status().isUnauthorized());
+
+    mockMvc
+        .perform(get("/actuator/prometheus").header("X-Admin-Api-Key", ADMIN_API_KEY))
+        .andExpect(status().isOk());
+  }
 }

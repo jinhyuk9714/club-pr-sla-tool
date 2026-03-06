@@ -1,5 +1,6 @@
 package com.club.sla.notify;
 
+import com.club.sla.delivery.OutboundDeliveryJobType;
 import com.club.sla.sla.SlaAction;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -24,6 +25,10 @@ public class DeadLetterEvent {
 
   @Column(name = "payload", nullable = false, columnDefinition = "text")
   private String payload;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "job_type")
+  private OutboundDeliveryJobType jobType;
 
   @Column(name = "repo_id")
   private Long repoId;
@@ -67,8 +72,20 @@ public class DeadLetterEvent {
       Long repoId,
       Long prNumber,
       SlaAction stage) {
+    this(reason, payload, createdAt, repoId, prNumber, stage, null);
+  }
+
+  public DeadLetterEvent(
+      String reason,
+      String payload,
+      Instant createdAt,
+      Long repoId,
+      Long prNumber,
+      SlaAction stage,
+      OutboundDeliveryJobType jobType) {
     this.reason = reason;
     this.payload = payload;
+    this.jobType = jobType;
     this.repoId = repoId;
     this.prNumber = prNumber;
     this.stage = stage;
@@ -94,6 +111,10 @@ public class DeadLetterEvent {
 
   public Long getRepoId() {
     return repoId;
+  }
+
+  public OutboundDeliveryJobType getJobType() {
+    return jobType;
   }
 
   public Long getPrNumber() {

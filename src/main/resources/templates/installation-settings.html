@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Installation Settings</title>
+  </head>
+  <body>
+    <main>
+      <h1 th:text="${installation.accountLogin()}">installation</h1>
+      <p th:if="${error}" th:text="${error}">error</p>
+      <form
+          th:action="@{/app/installations/{installationId}/settings(installationId=${installation.installationId()})}"
+          method="post">
+        <label for="discordWebhookUrl">Discord webhook</label>
+        <input id="discordWebhookUrl" name="discordWebhookUrl" type="url" />
+        <button type="submit">Save</button>
+      </form>
+      <ul>
+        <li th:each="repository : ${installation.repositoryFullNames()}" th:text="${repository}">
+          repository
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

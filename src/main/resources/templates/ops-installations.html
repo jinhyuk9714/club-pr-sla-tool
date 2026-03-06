@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ops Installations</title>
+  </head>
+  <body>
+    <main>
+      <nav>
+        <a th:href="@{/ops}">Overview</a>
+        <a th:href="@{/ops/installations}">Installations</a>
+        <a th:href="@{/ops/deliveries}">Deliveries</a>
+        <a th:href="@{/ops/dead-letters}">Dead letters</a>
+      </nav>
+      <h1>Installations</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>Installation</th>
+            <th>Account</th>
+            <th>Status</th>
+            <th>Configured</th>
+            <th>Active repositories</th>
+            <th>Updated</th>
+            <th>Settings</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="installation : ${installations}">
+            <td th:text="${installation.installationId()}">7001</td>
+            <td th:text="${installation.accountLogin()}">club-org</td>
+            <td th:text="${installation.status()}">ACTIVE</td>
+            <td th:text="${installation.configured()}">true</td>
+            <td th:text="${installation.activeRepositoryCount()}">2</td>
+            <td th:text="${installation.updatedAt()}">updated</td>
+            <td>
+              <a
+                  th:href="@{/app/installations/{installationId}(installationId=${installation.installationId()})}">
+                Open settings
+              </a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </body>
+</html>

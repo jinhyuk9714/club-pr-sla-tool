@@ -1,64 +1,36 @@
 package com.club.sla.notify.discord;
 
-import com.club.sla.notify.DeadLetterEvent;
-import com.club.sla.notify.DeadLetterRepository;
+import com.club.sla.installation.InstallationTrackingService;
 import com.club.sla.notify.NotificationMessage;
 import com.club.sla.notify.NotificationPort;
-import java.time.Clock;
-import java.time.Instant;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DiscordNotificationAdapter implements NotificationPort {
 
-  private static final int MAX_ATTEMPTS = 3;
-  private static final String DEAD_LETTER_REASON = "DISCORD_SEND_FAILED";
-
   private final DiscordWebhookClient discordWebhookClient;
-  private final DeadLetterRepository deadLetterRepository;
-  private final Clock clock = Clock.systemUTC();
-  private final String webhookUrl;
+  private final InstallationTrackingService installationTrackingService;
 
   public DiscordNotificationAdapter(
       DiscordWebhookClient discordWebhookClient,
-      DeadLetterRepository deadLetterRepository,
-      @Value("${discord.webhook.url:}") String webhookUrl) {
+      InstallationTrackingService installationTrackingService) {
     this.discordWebhookClient = discordWebhookClient;
-    this.deadLetterRepository = deadLetterRepository;
-    this.webhookUrl = webhookUrl;
+    this.installationTrackingService = installationTrackingService;
   }
 
   @Override
   public void send(NotificationMessage message) {
-    RuntimeException lastException = null;
+    String webhookUrl =
+        installationTrackingService
+            .findConfiguredDiscordWebhook(message.repoId())
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "No configured Discord webhook for repository " + message.repoId()));
     DiscordWebhookClient.DiscordWebhookPayload payload =
         new DiscordWebhookClient.DiscordWebhookPayload(buildNotificationContent(message));
 
-    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        if (webhookUrl == null || webhookUrl.isBlank()) {
-          throw new IllegalStateException("discord.webhook.url is not configured");
-        }
-        discordWebhookClient.post(webhookUrl, payload);
-        return;
-      } catch (RuntimeException ex) {
-        lastException = ex;
-      }
-    }
-
-    deadLetterRepository.save(
-        new DeadLetterEvent(
-            DEAD_LETTER_REASON,
-            payload.content(),
-            Instant.now(clock),
-            message.repoId(),
-            message.prNumber(),
-            message.stage()));
-
-    throw lastException == null
-        ? new IllegalStateException("discord notification failed without exception details")
-        : lastException;
+    discordWebhookClient.post(webhookUrl, payload);
   }
 
   private String buildNotificationContent(NotificationMessage message) {

@@ -3,11 +3,11 @@ package com.club.sla.notify;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.club.sla.delivery.OutboundDeliveryJobService;
 import com.club.sla.sla.SlaAction;
 import java.time.Clock;
 import java.time.Instant;
@@ -24,7 +24,7 @@ class DeadLetterReplayServiceTest {
 
   @Mock private DeadLetterRepository deadLetterRepository;
 
-  @Mock private SlaNotificationService slaNotificationService;
+  @Mock private OutboundDeliveryJobService outboundDeliveryJobService;
 
   private DeadLetterReplayService deadLetterReplayService;
 
@@ -33,7 +33,7 @@ class DeadLetterReplayServiceTest {
     deadLetterReplayService =
         new DeadLetterReplayService(
             deadLetterRepository,
-            slaNotificationService,
+            outboundDeliveryJobService,
             Clock.fixed(Instant.parse("2026-03-06T01:00:00Z"), ZoneOffset.UTC));
   }
 
@@ -48,8 +48,8 @@ class DeadLetterReplayServiceTest {
 
     assertThat(result.replayStatus()).isEqualTo(DeadLetterReplayStatus.REPLAYED);
     assertThat(result.replayedAt()).isNotNull();
-    verify(slaNotificationService, times(1))
-        .dispatch(new NotificationMessage(10L, 20L, SlaAction.ESCALATE_24H));
+    verify(outboundDeliveryJobService, times(1))
+        .enqueueDiscordNotification(new NotificationMessage(10L, 20L, SlaAction.ESCALATE_24H));
   }
 
   @Test
@@ -74,21 +74,21 @@ class DeadLetterReplayServiceTest {
   }
 
   @Test
-  void marksDeadLetterAsFailedWhenReplayDeliveryFails() {
+  void marksDeadLetterAsFailedWhenReplayEnqueueFails() {
     DeadLetterEvent deadLetter = replayableDeadLetter();
     when(deadLetterRepository.findById(1L)).thenReturn(Optional.of(deadLetter));
     when(deadLetterRepository.save(any(DeadLetterEvent.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
-    doThrow(new RuntimeException("send failed"))
-        .when(slaNotificationService)
-        .dispatch(any(NotificationMessage.class));
+    org.mockito.Mockito.doThrow(new RuntimeException("enqueue failed"))
+        .when(outboundDeliveryJobService)
+        .enqueueDiscordNotification(any(NotificationMessage.class));
 
     assertThatThrownBy(() -> deadLetterReplayService.replay(1L))
         .isInstanceOf(DeadLetterReplayService.DeadLetterReplayFailedException.class);
 
     assertThat(deadLetter.getReplayStatus()).isEqualTo(DeadLetterReplayStatus.FAILED);
     assertThat(deadLetter.getReplayAttempts()).isEqualTo(1);
-    assertThat(deadLetter.getLastError()).contains("send failed");
+    assertThat(deadLetter.getLastError()).contains("enqueue failed");
   }
 
   private DeadLetterEvent replayableDeadLetter() {

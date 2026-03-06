@@ -5,6 +5,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.club.sla.installation.InstallationTrackingService;
 import com.club.sla.notify.NotificationMessage;
 import com.club.sla.notify.SlaNotificationService;
 import com.club.sla.pr.PullRequestState;
@@ -28,6 +29,7 @@ class SlaReevaluationServiceTest {
   @Mock private PullRequestStateRepository pullRequestStateRepository;
   @Mock private SlaEventLogRepository slaEventLogRepository;
   @Mock private SlaNotificationService slaNotificationService;
+  @Mock private InstallationTrackingService installationTrackingService;
 
   private SlaReevaluationService slaReevaluationService;
 
@@ -38,6 +40,7 @@ class SlaReevaluationServiceTest {
             pullRequestStateRepository,
             slaEventLogRepository,
             slaNotificationService,
+            installationTrackingService,
             Clock.fixed(Instant.parse("2026-03-06T01:00:00Z"), ZoneOffset.UTC));
     ReflectionTestUtils.setField(slaReevaluationService, "fallback36hEnabled", false);
   }
@@ -59,6 +62,7 @@ class SlaReevaluationServiceTest {
     state.setFirstReviewAt(Instant.parse("2026-03-05T12:00:00Z"));
     when(pullRequestStateRepository.findByRepositoryIdAndPrNumber(1L, 101L))
         .thenReturn(Optional.of(state));
+    when(installationTrackingService.isRepositoryConfigured(1L)).thenReturn(true);
 
     SlaReevaluationResultDto result = slaReevaluationService.reevaluate(1L, 101L);
 
@@ -72,6 +76,7 @@ class SlaReevaluationServiceTest {
     when(pullRequestStateRepository.findByRepositoryIdAndPrNumber(1L, 102L))
         .thenReturn(Optional.of(state));
     when(slaEventLogRepository.findByRepoIdAndPrNumber(1L, 102L)).thenReturn(List.of());
+    when(installationTrackingService.isRepositoryConfigured(1L)).thenReturn(true);
 
     SlaReevaluationResultDto result = slaReevaluationService.reevaluate(1L, 102L);
 
@@ -89,6 +94,7 @@ class SlaReevaluationServiceTest {
             List.of(
                 new SlaEventLog(
                     1L, 103L, SlaAction.REMIND_12H, Instant.parse("2026-03-05T22:00:00Z"))));
+    when(installationTrackingService.isRepositoryConfigured(1L)).thenReturn(true);
 
     SlaReevaluationResultDto result = slaReevaluationService.reevaluate(1L, 103L);
 
@@ -102,6 +108,7 @@ class SlaReevaluationServiceTest {
     when(pullRequestStateRepository.findByRepositoryIdAndPrNumber(1L, 104L))
         .thenReturn(Optional.of(state));
     when(slaEventLogRepository.findByRepoIdAndPrNumber(1L, 104L)).thenReturn(List.of());
+    when(installationTrackingService.isRepositoryConfigured(1L)).thenReturn(true);
 
     SlaReevaluationResultDto result = slaReevaluationService.reevaluate(1L, 104L);
 
@@ -110,6 +117,19 @@ class SlaReevaluationServiceTest {
     assertThat(result.reason()).isEqualTo("ACTION_DISPATCHED");
     verify(slaNotificationService, times(1))
         .dispatch(new NotificationMessage(1L, 104L, SlaAction.REMIND_12H));
+  }
+
+  @Test
+  void returnsRepositoryNotTrackedWhenInstallationIsNotConfigured() {
+    PullRequestState state = readyPullRequest(1L, 105L, Instant.parse("2026-03-05T10:00:00Z"));
+    when(pullRequestStateRepository.findByRepositoryIdAndPrNumber(1L, 105L))
+        .thenReturn(Optional.of(state));
+    when(installationTrackingService.isRepositoryConfigured(1L)).thenReturn(false);
+
+    SlaReevaluationResultDto result = slaReevaluationService.reevaluate(1L, 105L);
+
+    assertThat(result.actionDispatched()).isFalse();
+    assertThat(result.reason()).isEqualTo("REPOSITORY_NOT_TRACKED");
   }
 
   private PullRequestState readyPullRequest(Long repoId, Long prNumber, Instant readyAt) {

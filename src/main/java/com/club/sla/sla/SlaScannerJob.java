@@ -1,5 +1,8 @@
 package com.club.sla.sla;
 
+import com.club.sla.github.GithubPullRequestCheckService;
+import com.club.sla.github.GithubPullRequestCheckState;
+import com.club.sla.installation.InstallationTrackingService;
 import com.club.sla.metrics.SlaMetrics;
 import com.club.sla.notify.NotificationMessage;
 import com.club.sla.notify.SlaNotificationService;
@@ -25,6 +28,8 @@ public class SlaScannerJob {
   private final SlaEventLogRepository slaEventLogRepository;
   private final SlaNotificationService slaNotificationService;
   private final SlaMetrics slaMetrics;
+  private final InstallationTrackingService installationTrackingService;
+  private final GithubPullRequestCheckService githubPullRequestCheckService;
   private final SlaEngine slaEngine = new SlaEngine();
   private final Clock clock = Clock.systemUTC();
 
@@ -36,12 +41,16 @@ public class SlaScannerJob {
       PullRequestStateRepository pullRequestStateRepository,
       SlaEventLogRepository slaEventLogRepository,
       SlaNotificationService slaNotificationService,
-      SlaMetrics slaMetrics) {
+      SlaMetrics slaMetrics,
+      InstallationTrackingService installationTrackingService,
+      GithubPullRequestCheckService githubPullRequestCheckService) {
     this.schedulerLockService = schedulerLockService;
     this.pullRequestStateRepository = pullRequestStateRepository;
     this.slaEventLogRepository = slaEventLogRepository;
     this.slaNotificationService = slaNotificationService;
     this.slaMetrics = slaMetrics;
+    this.installationTrackingService = installationTrackingService;
+    this.githubPullRequestCheckService = githubPullRequestCheckService;
   }
 
   @Scheduled(
@@ -71,6 +80,9 @@ public class SlaScannerJob {
 
   private void processPullRequest(PullRequestState pullRequest, Instant now) {
     try {
+      if (!installationTrackingService.isRepositoryConfigured(pullRequest.getRepositoryId())) {
+        return;
+      }
       Set<SlaAction> sentStages =
           loadSentStages(pullRequest.getRepositoryId(), pullRequest.getPrNumber());
       SlaEvaluation evaluation =
@@ -86,9 +98,20 @@ public class SlaScannerJob {
       slaNotificationService.dispatch(
           new NotificationMessage(
               pullRequest.getRepositoryId(), pullRequest.getPrNumber(), evaluation.action()));
+      githubPullRequestCheckService.syncStatus(
+          pullRequest.getRepositoryId(),
+          pullRequest.getPrNumber(),
+          pullRequest.getHeadSha(),
+          toCheckState(evaluation.action()));
     } catch (RuntimeException ignored) {
       // Individual PR failures should not block other PR evaluations.
     }
+  }
+
+  private GithubPullRequestCheckState toCheckState(SlaAction action) {
+    return action == SlaAction.REMIND_12H
+        ? GithubPullRequestCheckState.AT_RISK
+        : GithubPullRequestCheckState.BREACHED;
   }
 
   private Set<SlaAction> loadSentStages(Long repositoryId, Long prNumber) {

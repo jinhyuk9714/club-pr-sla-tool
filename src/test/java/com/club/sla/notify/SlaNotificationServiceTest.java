@@ -1,27 +1,25 @@
 package com.club.sla.notify;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.club.sla.delivery.OutboundDeliveryJobService;
 import com.club.sla.metrics.SlaMetrics;
 import com.club.sla.sla.SlaAction;
-import com.club.sla.sla.SlaEventLog;
 import com.club.sla.sla.SlaEventLogRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class SlaNotificationServiceTest {
 
-  @Mock private NotificationPort notificationPort;
+  @Mock private OutboundDeliveryJobService outboundDeliveryJobService;
 
   @Mock private SlaEventLogRepository slaEventLogRepository;
 
@@ -40,9 +38,8 @@ class SlaNotificationServiceTest {
     slaNotificationService.dispatch(message);
     slaNotificationService.dispatch(message);
 
-    verify(notificationPort, times(1)).send(message);
-    verify(slaEventLogRepository, times(1)).save(any(SlaEventLog.class));
-    verify(slaMetrics, times(1)).incrementNotification(SlaAction.REMIND_12H);
+    verify(outboundDeliveryJobService, times(1)).enqueueDiscordNotification(message);
+    verify(slaMetrics, never()).incrementNotification(SlaAction.REMIND_12H);
   }
 
   @Test
@@ -58,28 +55,9 @@ class SlaNotificationServiceTest {
     slaNotificationService.dispatch(remind);
     slaNotificationService.dispatch(escalate);
 
-    verify(notificationPort, times(1)).send(remind);
-    verify(notificationPort, times(1)).send(escalate);
-    verify(slaEventLogRepository, times(2)).save(any(SlaEventLog.class));
-    verify(slaMetrics, times(1)).incrementNotification(SlaAction.REMIND_12H);
-    verify(slaMetrics, times(1)).incrementNotification(SlaAction.ESCALATE_24H);
-  }
-
-  @Test
-  void ignoresRaceConditionUniqueViolationWithoutRetrying() {
-    NotificationMessage message = new NotificationMessage(1L, 10L, SlaAction.REMIND_12H);
-
-    when(slaEventLogRepository.existsByRepoIdAndPrNumberAndStage(1L, 10L, SlaAction.REMIND_12H))
-        .thenReturn(false);
-    doThrow(new DataIntegrityViolationException("duplicate"))
-        .when(slaEventLogRepository)
-        .save(any(SlaEventLog.class));
-
-    slaNotificationService.dispatch(message);
-
-    verify(notificationPort, times(1)).send(message);
-    verify(slaEventLogRepository, times(1)).save(any(SlaEventLog.class));
-    verify(slaMetrics, times(1)).incrementNotification(SlaAction.REMIND_12H);
+    verify(outboundDeliveryJobService, times(1)).enqueueDiscordNotification(remind);
+    verify(outboundDeliveryJobService, times(1)).enqueueDiscordNotification(escalate);
+    verify(slaMetrics, never()).incrementNotification(any(SlaAction.class));
   }
 
   @Test
@@ -91,8 +69,8 @@ class SlaNotificationServiceTest {
 
     slaNotificationService.dispatch(message);
 
-    verify(notificationPort, never()).send(any(NotificationMessage.class));
-    verify(slaEventLogRepository, never()).save(any(SlaEventLog.class));
+    verify(outboundDeliveryJobService, never())
+        .enqueueDiscordNotification(any(NotificationMessage.class));
     verify(slaMetrics, never()).incrementNotification(any(SlaAction.class));
   }
 }

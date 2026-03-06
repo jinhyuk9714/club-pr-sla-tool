@@ -1,7 +1,9 @@
 package com.club.sla.dashboard;
 
+import com.club.sla.installation.InstallationTrackingService;
 import com.club.sla.pr.PullRequestState;
 import com.club.sla.pr.PullRequestStateRepository;
+import com.club.sla.pr.PullRequestStatus;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,19 +15,29 @@ import org.springframework.stereotype.Service;
 public class DashboardQueryService {
 
   private final PullRequestStateRepository pullRequestStateRepository;
+  private final InstallationTrackingService installationTrackingService;
   private final Clock clock;
 
   @Autowired
-  public DashboardQueryService(PullRequestStateRepository pullRequestStateRepository) {
-    this(pullRequestStateRepository, Clock.systemUTC());
+  public DashboardQueryService(
+      PullRequestStateRepository pullRequestStateRepository,
+      InstallationTrackingService installationTrackingService) {
+    this(pullRequestStateRepository, installationTrackingService, Clock.systemUTC());
   }
 
-  DashboardQueryService(PullRequestStateRepository pullRequestStateRepository, Clock clock) {
+  DashboardQueryService(
+      PullRequestStateRepository pullRequestStateRepository,
+      InstallationTrackingService installationTrackingService,
+      Clock clock) {
     this.pullRequestStateRepository = pullRequestStateRepository;
+    this.installationTrackingService = installationTrackingService;
     this.clock = clock;
   }
 
   public DashboardSummaryDto fetch(Long repositoryId) {
+    if (!installationTrackingService.isRepositoryActive(repositoryId)) {
+      return new DashboardSummaryDto(0, 0, 0);
+    }
     List<PullRequestState> states =
         pullRequestStateRepository.findByRepositoryIdAndReadyAtIsNotNull(repositoryId);
     long onTrack = 0;
@@ -35,6 +47,9 @@ public class DashboardQueryService {
     Instant now = Instant.now(clock);
     for (PullRequestState state : states) {
       if (state.getReadyAt() == null) {
+        continue;
+      }
+      if (state.getStatus() == PullRequestStatus.DRAFT && state.getFirstReviewAt() == null) {
         continue;
       }
       if (state.getFirstReviewAt() != null) {

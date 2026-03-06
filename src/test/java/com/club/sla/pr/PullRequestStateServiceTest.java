@@ -50,6 +50,7 @@ class PullRequestStateServiceTest {
     PullRequestState state = pullRequestStateService.onDraft(100L, 13L);
 
     assertThat(state.getStatus()).isEqualTo(PullRequestStatus.DRAFT);
+    assertThat(state.getReadyAt()).isNull();
   }
 
   @Test

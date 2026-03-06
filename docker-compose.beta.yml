@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: club_sla
+      POSTGRES_USER: club_sla
+      POSTGRES_PASSWORD: club_sla
+    volumes:
+      - beta_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U club_sla -d club_sla"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - ${BETA_ENV_FILE:-.env.beta}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/club_sla
+      SPRING_DATASOURCE_USERNAME: club_sla
+      SPRING_DATASOURCE_PASSWORD: club_sla
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - beta_caddy_data:/data
+      - beta_caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  beta_postgres_data:
+  beta_caddy_data:
+  beta_caddy_config:

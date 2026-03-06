@@ -55,6 +55,22 @@ class InstallationOnboardingControllerTest {
   }
 
   @Test
+  void rendersOnboardingErrorPageWhenSetupAccessCheckFails() throws Exception {
+    GithubAuthenticatedUser authenticatedUser =
+        new GithubAuthenticatedUser(101L, "alice", "user-token");
+    given(githubUserSessionService.currentUser()).willReturn(Optional.of(authenticatedUser));
+    given(installationOnboardingService.userCanAccessInstallation(authenticatedUser, 7001L))
+        .willReturn(false);
+
+    mockMvc
+        .perform(get("/app/installations/setup").param("installation_id", "7001"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("onboarding-error"))
+        .andExpect(model().attribute("title", "설치 설정을 계속할 수 없습니다"))
+        .andExpect(model().attribute("message", "설치 권한을 다시 확인한 뒤 로그인부터 다시 시도하세요."));
+  }
+
+  @Test
   void rendersSettingsPageForAuthorizedUser() throws Exception {
     GithubAuthenticatedUser authenticatedUser =
         new GithubAuthenticatedUser(101L, "alice", "user-token");

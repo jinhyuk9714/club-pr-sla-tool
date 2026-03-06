@@ -1,15 +1,16 @@
 # Club PR SLA Tool
 
-설치형 GitHub App 기반 PR 리뷰 SLA 서비스입니다. 현재 운영 계약은 `single app container + Postgres` 기준의 private beta이며, 사용자는 서비스 홈에서 GitHub 로그인 후 App을 설치하고 installation별 Discord webhook 한 개만 저장하면 바로 PR 리뷰 지연 추적을 시작할 수 있습니다.
+설치형 GitHub App 기반 PR 리뷰 SLA 서비스입니다. 현재 운영 모델은 `single VPS + Docker Compose + Caddy + Postgres` 기준의 private beta이며, 사용자는 서비스 홈에서 GitHub App을 설치하고 installation별 Discord webhook 한 개만 저장하면 바로 PR 리뷰 지연 추적을 시작할 수 있습니다.
 
 ## 사용자 흐름
 
 1. 서비스 홈 `/` 접속
-2. `GitHub으로 시작하기`로 로그인
-3. GitHub App 설치
-4. GitHub App `setup_url`로 `/app/installations/setup?installation_id=...` 복귀
-5. 설치별 설정 페이지 `/app/installations/{installationId}` 에서 Discord webhook 저장
-6. 이후 `ready_for_review` PR부터 SLA 추적, Discord 알림, GitHub Check 상태 갱신
+2. `GitHub App 설치`
+3. GitHub App `setup_url` 로 `/app/installations/setup?installation_id=...` 복귀
+4. installation 설정 페이지 `/app/installations/{installationId}` 에서 Discord webhook 저장
+5. 이후 `ready_for_review` PR부터 SLA 추적, Discord 알림, GitHub Check 상태 갱신
+
+이미 설치를 끝낸 사용자는 홈의 `설치 후 설정 계속하기` 에 installation ID를 넣어 설정 화면으로 다시 진입할 수 있습니다.
 
 ## 현재 제공 기능
 
@@ -37,34 +38,23 @@
   - retry backoff `1m -> 5m -> 15m`
   - 3회 실패 후 dead letter 전환
 
-## Private Beta 계약
-
-- 배포 모델은 `앱 1개 컨테이너 + Postgres` 로 고정합니다.
-- beta 사용자 제어는 환경 변수 allowlist로만 합니다.
-  - `BETA_ALLOWED_GITHUB_LOGINS`
-  - `BETA_ALLOWED_GITHUB_ACCOUNTS`
-- 외부 전송은 직접 호출하지 않고 `outbound_delivery_jobs` 테이블에 적재한 뒤 워커가 비동기로 처리합니다.
-- Prometheus 메트릭은 공개하지 않으며 `X-Admin-Api-Key` 헤더가 있어야 `/actuator/prometheus` 에 접근할 수 있습니다.
-
 ## GitHub App 설정
-
-GitHub App을 직접 만들어 이 서비스에 연결해야 합니다.
 
 - Homepage URL: `https://<your-host>/`
 - Callback URL: `https://<your-host>/auth/github/callback`
 - Setup URL: `https://<your-host>/app/installations/setup`
 - Webhook URL: `https://<your-host>/api/webhooks/github`
-- Permissions:
+- Permissions
   - `Pull requests`: Read-only
   - `Checks`: Read and write
   - `Metadata`: Read-only
-- Subscribe to events:
+- Subscribe to events
   - `Pull request`
   - `Pull request review`
   - `Installation`
   - `Installation repositories`
 
-자세한 체크리스트는 [docs/runbooks/github-app-checklist.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/github-app-checklist.md) 를 참고하세요.
+자세한 체크리스트는 [docs/runbooks/github-app-checklist.md](docs/runbooks/github-app-checklist.md) 를 참고하세요.
 
 ## 필수 환경 변수
 
@@ -79,10 +69,11 @@ GitHub App을 직접 만들어 이 서비스에 연결해야 합니다.
 - `GITHUB_APP_INSTALL_URL`
 - `APP_SECURITY_ENCRYPTION_SECRET`
 - `OPS_ADMIN_API_KEY`
-- `BETA_ALLOWED_GITHUB_LOGINS` 또는 `BETA_ALLOWED_GITHUB_ACCOUNTS`
+- `BETA_ALLOWED_GITHUB_LOGINS`
 
-## 선택 환경 변수
+선택:
 
+- `BETA_ALLOWED_GITHUB_ACCOUNTS`
 - `SLA_SCANNER_INTERVAL_MS`
 - `SLA_SCANNER_INITIAL_DELAY_MS`
 - `OUTBOUND_JOBS_INTERVAL_MS`
@@ -95,35 +86,38 @@ GitHub App을 직접 만들어 이 서비스에 연결해야 합니다.
 1. `.env` 생성
    - `cp .env.example .env`
 2. 필수 값 설정
-   - `GITHUB_WEBHOOK_SECRET`
-   - `GITHUB_APP_APP_ID`
-   - `GITHUB_APP_PRIVATE_KEY`
-   - `GITHUB_APP_CLIENT_ID`
-   - `GITHUB_APP_CLIENT_SECRET`
-   - `GITHUB_APP_INSTALL_URL`
-   - `APP_SECURITY_ENCRYPTION_SECRET`
-   - `OPS_ADMIN_API_KEY`
-   - `BETA_ALLOWED_GITHUB_LOGINS` 또는 `BETA_ALLOWED_GITHUB_ACCOUNTS`
 3. 로컬 인프라 실행
    - `./scripts/dev-up.sh`
 4. 테스트
    - `./gradlew clean test`
 5. 앱 실행
-   - `./gradlew bootRun`
+   - 기본: `./gradlew bootRun`
+   - 포트 충돌 시: `SERVER_PORT=8081 ./gradlew bootRun`
 6. 헬스체크
-   - `curl http://localhost:8080/api/health`
+   - 기본: `curl http://localhost:8080/api/health`
+   - 포트 변경 시: `curl http://localhost:8081/api/health`
 
-실제 GitHub App 설치와 webhook 수신까지 로컬에서 검증하려면 `ngrok` 같은 public tunnel이 필요합니다. 자세한 절차는 [docs/runbooks/local-setup.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/local-setup.md) 를 참고하세요.
-디자인 파트너 온보딩과 운영 점검 절차는 [docs/runbooks/design-partner-onboarding-checklist.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/design-partner-onboarding-checklist.md), [docs/runbooks/operator-daily-check.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/operator-daily-check.md), [docs/runbooks/incident-triage-replay.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/incident-triage-replay.md) 에 정리했습니다.
+실제 GitHub App 설치와 webhook 수신까지 로컬에서 검증하려면 `ngrok` 같은 public tunnel이 필요합니다. 자세한 절차는 [docs/runbooks/local-setup.md](docs/runbooks/local-setup.md) 를 참고하세요.
 
-## Docker 이미지
+## VPS 배포
 
-- 이미지 빌드
-  - `docker build -t club-pr-sla:beta .`
-- 컨테이너 실행
-  - `docker run --env-file .env -p 8080:8080 club-pr-sla:beta`
+private beta 배포는 `docker compose` 기준으로 고정합니다.
+`docker-compose.beta.yml` 은 `BETA_ENV_FILE` 값을 보고 앱 컨테이너에 주입할 env 파일을 결정합니다. 운영 기본값은 `.env.beta` 입니다.
 
-실제 private beta 배포 절차는 [docs/runbooks/private-beta-launch.md](/Users/sungjh/club-pr-tool/.worktrees/codex-installable-github-app-v1/docs/runbooks/private-beta-launch.md) 에 정리했습니다.
+1. 배포용 env 작성
+   - `cp .env.beta.example .env.beta`
+2. 이미지/서비스 기동
+   - `docker compose --env-file .env.beta -f docker-compose.beta.yml up -d --build`
+3. health 확인
+   - `curl https://<your-host>/api/health`
+
+자세한 절차는 아래 문서를 참고하세요.
+
+- 배포: [docs/runbooks/private-beta-launch.md](docs/runbooks/private-beta-launch.md)
+- VPS 준비: [docs/runbooks/vps-bootstrap.md](docs/runbooks/vps-bootstrap.md)
+- 디자인 파트너 온보딩: [docs/runbooks/design-partner-onboarding-checklist.md](docs/runbooks/design-partner-onboarding-checklist.md)
+- 운영 점검: [docs/runbooks/operator-daily-check.md](docs/runbooks/operator-daily-check.md)
+- 장애 복구: [docs/runbooks/incident-triage-replay.md](docs/runbooks/incident-triage-replay.md)
 
 ## 주요 라우트
 
@@ -164,5 +158,5 @@ GitHub App을 직접 만들어 이 서비스에 연결해야 합니다.
 
 ## 검증 명령
 
-- `./gradlew test`
+- `./gradlew clean test`
 - `./scripts/check.sh`

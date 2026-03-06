@@ -3,8 +3,10 @@ package com.club.sla.onboarding;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.club.sla.github.GithubAuthenticatedUser;
 import org.junit.jupiter.api.Test;
@@ -52,5 +54,18 @@ class GithubAuthenticationControllerTest {
         .andExpect(redirectedUrl("/app/installations/setup?installation_id=7001"));
 
     verify(githubUserSessionService).storeAuthenticatedUser(authenticatedUser);
+  }
+
+  @Test
+  void rendersOnboardingErrorPageWhenCallbackFails() throws Exception {
+    given(githubAuthenticationService.authenticate("oauth-code", "state-1"))
+        .willThrow(new IllegalArgumentException("Invalid GitHub login state"));
+
+    mockMvc
+        .perform(get("/auth/github/callback").param("code", "oauth-code").param("state", "state-1"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("onboarding-error"))
+        .andExpect(model().attribute("title", "GitHub 로그인 실패"))
+        .andExpect(model().attribute("message", "다시 로그인하거나 GitHub App 설치부터 다시 시작하세요."));
   }
 }

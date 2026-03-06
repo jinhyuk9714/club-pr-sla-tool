@@ -1,6 +1,7 @@
 package com.club.sla.onboarding;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -28,6 +29,10 @@ class HomePageControllerTest {
         .andExpect(view().name("home"))
         .andExpect(
             model()
-                .attribute("installUrl", "https://github.com/apps/club-pr-sla/installations/new"));
+                .attribute("installUrl", "https://github.com/apps/club-pr-sla/installations/new"))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("GitHub App 설치")))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("설치 후 설정 계속하기")))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.containsString("name=\"installation_id\"")));
   }
 }

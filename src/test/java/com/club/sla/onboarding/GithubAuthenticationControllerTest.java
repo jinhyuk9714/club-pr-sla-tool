@@ -40,6 +40,17 @@ class GithubAuthenticationControllerTest {
   }
 
   @Test
+  void redirectsToInstallationsByDefaultWhenReturnToIsMissing() throws Exception {
+    given(githubAuthenticationService.createAuthorizationRedirectUrl("/app/installations"))
+        .willReturn("https://github.com/login/oauth/authorize?state=test-state");
+
+    mockMvc
+        .perform(get("/login/github"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("https://github.com/login/oauth/authorize?state=test-state"));
+  }
+
+  @Test
   void storesAuthenticatedUserAndRedirectsToOriginalLocation() throws Exception {
     GithubAuthenticatedUser authenticatedUser =
         new GithubAuthenticatedUser(101L, "alice", "user-token");
@@ -57,6 +68,21 @@ class GithubAuthenticationControllerTest {
   }
 
   @Test
+  void redirectsBareHomeCallbackToInstallations() throws Exception {
+    GithubAuthenticatedUser authenticatedUser =
+        new GithubAuthenticatedUser(101L, "alice", "user-token");
+    given(githubAuthenticationService.authenticate("oauth-code", "state-1"))
+        .willReturn(new GithubAuthenticationResult(authenticatedUser, "/"));
+
+    mockMvc
+        .perform(get("/auth/github/callback").param("code", "oauth-code").param("state", "state-1"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/app/installations"));
+
+    verify(githubUserSessionService).storeAuthenticatedUser(authenticatedUser);
+  }
+
+  @Test
   void rendersOnboardingErrorPageWhenCallbackFails() throws Exception {
     given(githubAuthenticationService.authenticate("oauth-code", "state-1"))
         .willThrow(new IllegalArgumentException("Invalid GitHub login state"));
@@ -66,6 +92,7 @@ class GithubAuthenticationControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("onboarding-error"))
         .andExpect(model().attribute("title", "GitHub 로그인 실패"))
-        .andExpect(model().attribute("message", "다시 로그인하거나 GitHub App 설치부터 다시 시작하세요."));
+        .andExpect(model().attribute("message", "다시 로그인하거나 GitHub App 설치부터 다시 시작하세요."))
+        .andExpect(model().attribute("loginUrl", "/login/github?returnTo=%2Fapp%2Finstallations"));
   }
 }

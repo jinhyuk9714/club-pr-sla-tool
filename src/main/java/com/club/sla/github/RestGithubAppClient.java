@@ -71,6 +71,35 @@ public class RestGithubAppClient implements GithubAppClient {
   }
 
   @Override
+  public List<GithubInstallationMetadata> listUserInstallations(String userAccessToken) {
+    GithubUserInstallationsResponse githubUserInstallationsResponse =
+        apiRestClient
+            .get()
+            .uri("/user/installations")
+            .header(HttpHeaders.ACCEPT, "application/json")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + userAccessToken)
+            .header("X-GitHub-Api-Version", API_VERSION)
+            .retrieve()
+            .body(GithubUserInstallationsResponse.class);
+    if (githubUserInstallationsResponse == null
+        || githubUserInstallationsResponse.installations() == null) {
+      throw new IllegalStateException("GitHub user installations lookup returned no data");
+    }
+    return githubUserInstallationsResponse.installations().stream()
+        .map(
+            installation ->
+                new GithubInstallationMetadata(
+                    installation.id(),
+                    installation.account().id(),
+                    installation.account().login(),
+                    "Organization".equalsIgnoreCase(installation.account().type())
+                        ? GithubInstallationAccountType.ORGANIZATION
+                        : GithubInstallationAccountType.USER,
+                    Instant.parse(installation.createdAt())))
+        .toList();
+  }
+
+  @Override
   public boolean userCanAccessInstallation(String userAccessToken, Long installationId) {
     try {
       apiRestClient
@@ -244,6 +273,8 @@ public class RestGithubAppClient implements GithubAppClient {
       Long id,
       GithubAccountResponse account,
       @com.fasterxml.jackson.annotation.JsonProperty("created_at") String createdAt) {}
+
+  record GithubUserInstallationsResponse(List<GithubInstallationResponse> installations) {}
 
   record GithubAccountResponse(Long id, String login, String type) {}
 

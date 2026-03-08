@@ -6,6 +6,8 @@ public interface GithubAppClient {
 
   GithubAuthenticatedUser exchangeCodeForUser(String code, String redirectUri);
 
+  List<GithubInstallationMetadata> listUserInstallations(String userAccessToken);
+
   boolean userCanAccessInstallation(String userAccessToken, Long installationId);
 
   GithubInstallationMetadata fetchInstallation(Long installationId);

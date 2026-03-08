@@ -25,7 +25,7 @@ public class GithubAuthenticationController {
   }
 
   @GetMapping("/login/github")
-  public RedirectView login(@RequestParam(defaultValue = "/") String returnTo) {
+  public RedirectView login(@RequestParam(defaultValue = "/app/installations") String returnTo) {
     return new RedirectView(githubAuthenticationService.createAuthorizationRedirectUrl(returnTo));
   }
 
@@ -36,13 +36,20 @@ public class GithubAuthenticationController {
           githubAuthenticationService.authenticate(code, state);
       githubUserSessionService.storeAuthenticatedUser(
           githubAuthenticationResult.authenticatedUser());
-      return new RedirectView(githubAuthenticationResult.redirectPath());
+      return new RedirectView(normalizeRedirectPath(githubAuthenticationResult.redirectPath()));
     } catch (RuntimeException ex) {
       model.addAttribute("title", "GitHub 로그인 실패");
       model.addAttribute("message", "다시 로그인하거나 GitHub App 설치부터 다시 시작하세요.");
-      model.addAttribute("loginUrl", "/login/github?returnTo=%2F");
+      model.addAttribute("loginUrl", "/login/github?returnTo=%2Fapp%2Finstallations");
       model.addAttribute("installUrl", installUrl);
       return "onboarding-error";
     }
+  }
+
+  private String normalizeRedirectPath(String redirectPath) {
+    if (redirectPath == null || redirectPath.isBlank() || "/".equals(redirectPath)) {
+      return "/app/installations";
+    }
+    return redirectPath;
   }
 }

@@ -46,13 +46,49 @@ public class InstallationOnboardingController {
           "loginUrl",
           loginRedirectFor("/app/installations/setup?installation_id=" + installationId));
       model.addAttribute("installUrl", installUrl);
+      model.addAttribute("resumeUrl", "/app/installations");
       return "onboarding-error";
     }
     return new RedirectView("/app/installations/" + installationId);
   }
 
+  @GetMapping("/app/installations")
+  public Object installations(Model model) {
+    GithubAuthenticatedUser authenticatedUser = githubUserSessionService.currentUser().orElse(null);
+    if (authenticatedUser == null) {
+      return new RedirectView(loginRedirectFor("/app/installations"));
+    }
+
+    java.util.List<InstallationOnboardingView> accessibleInstallations =
+        installationOnboardingService.listAccessibleInstallations(authenticatedUser);
+    if (accessibleInstallations.isEmpty()) {
+      model.addAttribute("title", "설치된 GitHub App이 없습니다");
+      model.addAttribute("message", "GitHub App을 설치한 뒤 다시 돌아오면 바로 Discord webhook을 연결할 수 있습니다.");
+      model.addAttribute("installations", accessibleInstallations);
+      model.addAttribute("emptyState", true);
+      model.addAttribute("installUrl", installUrl);
+      model.addAttribute("loginUrl", loginRedirectFor("/app/installations"));
+      return "installation-selector";
+    }
+    if (accessibleInstallations.size() == 1) {
+      return new RedirectView(
+          "/app/installations/" + accessibleInstallations.getFirst().installationId());
+    }
+
+    model.addAttribute("title", "설정할 설치를 선택하세요");
+    model.addAttribute("message", "설정할 GitHub App 설치를 고르면 Discord webhook 연결 화면으로 이동합니다.");
+    model.addAttribute("installations", accessibleInstallations);
+    model.addAttribute("emptyState", false);
+    model.addAttribute("installUrl", installUrl);
+    model.addAttribute("loginUrl", loginRedirectFor("/app/installations"));
+    return "installation-selector";
+  }
+
   @GetMapping("/app/installations/{installationId}")
-  public String settings(@PathVariable Long installationId, Model model) {
+  public String settings(
+      @PathVariable Long installationId,
+      @RequestParam(name = "saved", defaultValue = "0") int saved,
+      Model model) {
     GithubAuthenticatedUser authenticatedUser = githubUserSessionService.currentUser().orElse(null);
     if (authenticatedUser == null) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
@@ -63,6 +99,12 @@ public class InstallationOnboardingController {
     }
     model.addAttribute(
         "installation", installationOnboardingService.loadInstallationView(installationId));
+    model.addAttribute("saved", saved == 1);
+    if (saved == 1) {
+      model.addAttribute(
+          "successMessage",
+          "Discord webhook이 저장되었습니다. 이제 draft PR을 Ready for review로 바꾸면 Club PR SLA check를 확인할 수 있습니다.");
+    }
     return "installation-settings";
   }
 

@@ -41,6 +41,45 @@ class DefaultInstallationOnboardingServiceTest {
   @Mock private BetaAccessPolicy betaAccessPolicy;
 
   @Test
+  void listsAccessibleInstallationsForAllowlistedUser() {
+    DefaultInstallationOnboardingService service =
+        new DefaultInstallationOnboardingService(
+            githubAppClient,
+            installationRegistryService,
+            githubInstallationRepository,
+            githubInstallationRepositoryEntryRepository,
+            installationSettingsRepository,
+            discordWebhookValidationService,
+            discordWebhookCipher,
+            betaAccessPolicy);
+    GithubAuthenticatedUser authenticatedUser =
+        new GithubAuthenticatedUser(101L, "alice", "user-token");
+    GithubInstallationMetadata firstInstallation =
+        new GithubInstallationMetadata(
+            7001L, 991L, "club-org", GithubInstallationAccountType.ORGANIZATION, Instant.now());
+    GithubInstallationMetadata secondInstallation =
+        new GithubInstallationMetadata(
+            7002L, 992L, "blocked-org", GithubInstallationAccountType.ORGANIZATION, Instant.now());
+    given(githubAppClient.listUserInstallations("user-token"))
+        .willReturn(List.of(firstInstallation, secondInstallation));
+    given(betaAccessPolicy.isAllowed("alice", "club-org")).willReturn(true);
+    given(betaAccessPolicy.isAllowed("alice", "blocked-org")).willReturn(false);
+    given(githubAppClient.listInstallationRepositories(7001L))
+        .willReturn(
+            List.of(new GithubRepositoryMetadata(9001L, "club-pr-tool", "club-org/club-pr-tool")));
+
+    List<InstallationOnboardingView> result =
+        service.listAccessibleInstallations(authenticatedUser);
+
+    assertThat(result)
+        .containsExactly(
+            new InstallationOnboardingView(
+                7001L, "club-org", List.of("club-org/club-pr-tool"), false));
+    verify(installationRegistryService).upsertInstallation(any());
+    verify(installationRegistryService).syncRepositories(any(), any());
+  }
+
+  @Test
   void syncsInstallationAndBuildsView() {
     DefaultInstallationOnboardingService service =
         new DefaultInstallationOnboardingService(

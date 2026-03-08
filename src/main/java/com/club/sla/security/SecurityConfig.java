@@ -32,6 +32,8 @@ public class SecurityConfig {
                 authz
                     .requestMatchers(HttpMethod.GET, "/", "/login/github", "/auth/github/callback")
                     .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/app/installations")
+                    .permitAll()
                     .requestMatchers(HttpMethod.GET, "/app/installations/setup")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/ops/login")

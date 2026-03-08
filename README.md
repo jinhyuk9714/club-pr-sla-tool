@@ -160,3 +160,4 @@ private beta 배포는 `docker compose` 기준으로 고정합니다.
 
 - `./gradlew clean test`
 - `./scripts/check.sh`
+

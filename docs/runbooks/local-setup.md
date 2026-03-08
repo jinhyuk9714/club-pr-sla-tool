@@ -9,6 +9,8 @@
 3. installation 설정 페이지에서 Discord webhook 저장
 4. PR `ready_for_review` 이후 GitHub Check 상태 확인
 
+반복 데모를 빠르게 다시 띄우는 목적이라면 [local-demo.md](local-demo.md) 를 먼저 봅니다.
+
 ## Prerequisites
 
 - Docker / Docker Compose
@@ -66,7 +68,7 @@ docker compose --env-file .env.beta.local -f docker-compose.beta.yml config -q
 3. 테스트 repository를 선택해서 설치
 4. 설치 완료 후 `/app/installations/setup?installation_id=...` 로 복귀 확인
 5. installation 설정 페이지에서 Discord webhook 저장
-6. 홈으로 돌아가더라도 설치를 끝낸 사용자는 `설치 후 설정 계속하기` 에 installation ID를 넣어 다시 들어갈 수 있어야 합니다
+6. 홈으로 돌아가더라도 설치를 끝낸 사용자는 `설치 후 설정 계속하기` 로 로그인한 뒤 자신의 설치 목록 또는 유일한 설치로 다시 들어갈 수 있어야 합니다
 
 ## 5. PR 동작 smoke test
 

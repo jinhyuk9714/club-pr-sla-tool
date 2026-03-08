@@ -10,7 +10,7 @@
 4. installation 설정 페이지 `/app/installations/{installationId}` 에서 Discord webhook 저장
 5. 이후 `ready_for_review` PR부터 SLA 추적, Discord 알림, GitHub Check 상태 갱신
 
-이미 설치를 끝낸 사용자는 홈의 `설치 후 설정 계속하기` 에 installation ID를 넣어 설정 화면으로 다시 진입할 수 있습니다.
+이미 설치를 끝낸 사용자는 홈의 `설치 후 설정 계속하기` 로 로그인한 뒤, 자신의 설치 목록 또는 유일한 설치로 바로 다시 진입할 수 있습니다.
 
 ## 현재 제공 기능
 
@@ -98,6 +98,7 @@
    - 포트 변경 시: `curl http://localhost:8081/api/health`
 
 실제 GitHub App 설치와 webhook 수신까지 로컬에서 검증하려면 `ngrok` 같은 public tunnel이 필요합니다. 자세한 절차는 [docs/runbooks/local-setup.md](docs/runbooks/local-setup.md) 를 참고하세요.
+반복 가능한 임시 데모 세션은 [docs/runbooks/local-demo.md](docs/runbooks/local-demo.md) 를 따릅니다.
 
 ## VPS 배포
 

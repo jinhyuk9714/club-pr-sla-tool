@@ -1,163 +1,199 @@
 # Club PR SLA Tool
 
-설치형 GitHub App 기반 PR 리뷰 SLA 서비스입니다. 현재 운영 모델은 `single VPS + Docker Compose + Caddy + Postgres` 기준의 private beta이며, 사용자는 서비스 홈에서 GitHub App을 설치하고 installation별 Discord webhook 한 개만 저장하면 바로 PR 리뷰 지연 추적을 시작할 수 있습니다.
+PR 리뷰가 늦어지는 순간을 GitHub Check와 Discord로 알려주는 설치형 GitHub App입니다.  
+처음 목표는 단순했습니다. 팀 안에서 "누가 리뷰해야 하는지", "얼마나 늦었는지", "운영자가 어디를 봐야 하는지"를 사람 기억에 맡기지 않는 도구를 만드는 것이었습니다.
 
-## 사용자 흐름
+이 프로젝트는 그 문제를 다음 흐름으로 풀었습니다.
 
-1. 서비스 홈 `/` 접속
-2. `GitHub App 설치`
-3. GitHub App `setup_url` 로 `/app/installations/setup?installation_id=...` 복귀
-4. installation 설정 페이지 `/app/installations/{installationId}` 에서 Discord webhook 저장
-5. 이후 `ready_for_review` PR부터 SLA 추적, Discord 알림, GitHub Check 상태 갱신
+1. 저장소에 GitHub App을 설치합니다.
+2. installation별 Discord webhook을 한 번 연결합니다.
+3. PR이 `Ready for review` 상태가 되면 SLA 추적을 시작합니다.
+4. 리뷰가 늦어지면 Discord와 GitHub Check에 상태를 반영합니다.
+5. 운영자는 `/ops` 화면에서 설치 상태, 작업 큐, dead letter를 확인합니다.
 
-이미 설치를 끝낸 사용자는 홈의 `설치 후 설정 계속하기` 로 로그인한 뒤, 자신의 설치 목록 또는 유일한 설치로 바로 다시 진입할 수 있습니다.
+## 왜 만들었는가
 
-## 현재 제공 기능
+PR 리뷰 지연은 흔한 문제지만, 실제로는 추적이 잘 안 됩니다.  
+슬랙이나 디스코드에 사람이 직접 올리면 누락되기 쉽고, 저장소가 늘어나면 누가 어떤 PR을 봐야 하는지도 금방 흐려집니다.
 
-- GitHub App installation / installation_repositories webhook 수집
-- installation별 활성 repository 동기화
-- installation별 Discord webhook 암호화 저장
-- PR `ready_for_review`, `converted_to_draft`, `pull_request_review.submitted` 추적
-- 12h reminder / 24h escalation / optional 36h fallback SLA 스캐너
-- GitHub Check 상태 동기화
+그래서 이 프로젝트는 "리뷰 SLA를 운영 가능한 형태로 자동화하는 서비스"를 목표로 잡았습니다.
+
+- 사용자는 GitHub App 설치와 Discord webhook 저장만 하면 됩니다.
+- PR 화면에서는 `Club PR SLA` Check로 현재 상태를 바로 볼 수 있습니다.
+- 운영자는 별도 `/ops` 화면에서 실패한 알림과 dead letter까지 관리할 수 있습니다.
+
+핵심은 알림 봇 하나를 만드는 것이 아니라, 설치형 제품처럼 써볼 수 있는 운영 도구를 만드는 것이었습니다.
+
+## 무엇을 만들었는가
+
+사용자 기준 흐름은 아주 짧습니다.
+
+1. 서비스 홈에 들어갑니다.
+2. `GitHub App 설치`를 누릅니다.
+3. 설치 후 설정 화면에서 Discord webhook을 저장합니다.
+4. 이후 draft PR을 `Ready for review`로 바꾸면 추적이 시작됩니다.
+
+이후 시스템은 다음을 자동으로 처리합니다.
+
+- GitHub PR Check 상태 표시
   - `On track`
   - `At risk`
   - `Breached`
   - `Reviewed`
   - `App setup required`
-- 운영 API
-  - dead letter 조회 / 재전송
-  - 단일 PR SLA 재평가
-  - audit log 조회
-- 내부 ops UI
-  - installation 상태 조회
-  - outbound delivery queue 조회
-  - dead letter replay
-- outbound delivery DB 작업 큐
-  - `DISCORD_NOTIFICATION`, `GITHUB_CHECK_SYNC`
-  - retry backoff `1m -> 5m -> 15m`
-  - 3회 실패 후 dead letter 전환
+- Discord reminder / escalation 전송
+- installation별 활성 저장소 동기화
+- 실패한 외부 전송의 retry / dead letter 처리
+- 운영자용 설치 상태, delivery queue, replay UI 제공
 
-## GitHub App 설정
+## 설계를 어떻게 가져갔는가
 
-- Homepage URL: `https://<your-host>/`
-- Callback URL: `https://<your-host>/auth/github/callback`
-- Setup URL: `https://<your-host>/app/installations/setup`
-- Webhook URL: `https://<your-host>/api/webhooks/github`
-- Permissions
-  - `Pull requests`: Read-only
-  - `Checks`: Read and write
-  - `Metadata`: Read-only
-- Subscribe to events
-  - `Pull request`
-  - `Pull request review`
-  - `Installation`
-  - `Installation repositories`
+### 1. 설치형 GitHub App을 기준으로 잡았다
 
-자세한 체크리스트는 [docs/runbooks/github-app-checklist.md](docs/runbooks/github-app-checklist.md) 를 참고하세요.
+처음부터 라이브러리나 GitHub Action보다 "설치형 GitHub App"에 가깝게 가는 편이 맞다고 봤습니다.  
+이 방식이 사용자 입장에서 가장 단순합니다. 저장소에 코드를 추가하지 않아도 되고, 설치 후 Discord webhook 한 번만 연결하면 되기 때문입니다.
 
-## 필수 환경 변수
+그래서 도메인도 installation 중심으로 잡았습니다.
 
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-- `GITHUB_WEBHOOK_SECRET`
-- `GITHUB_APP_APP_ID`
-- `GITHUB_APP_PRIVATE_KEY`
-- `GITHUB_APP_CLIENT_ID`
-- `GITHUB_APP_CLIENT_SECRET`
-- `GITHUB_APP_INSTALL_URL`
-- `APP_SECURITY_ENCRYPTION_SECRET`
-- `OPS_ADMIN_API_KEY`
-- `BETA_ALLOWED_GITHUB_LOGINS`
+- `github_installations`
+- `github_installation_repository_entries`
+- `installation_settings`
 
-선택:
+PR 상태는 기존 `pull_request_states`를 유지하되, installation과 repository 활성 여부를 기준으로만 추적하도록 했습니다.
 
-- `BETA_ALLOWED_GITHUB_ACCOUNTS`
-- `SLA_SCANNER_INTERVAL_MS`
-- `SLA_SCANNER_INITIAL_DELAY_MS`
-- `OUTBOUND_JOBS_INTERVAL_MS`
-- `SLA_FALLBACK_36H_ENABLED`
-- `OPS_SECURITY_RATE_LIMIT_MAX_REQUESTS`
-- `OPS_SECURITY_RATE_LIMIT_WINDOW_SECONDS`
+### 2. 알림은 직접 보내지 않고 DB 작업 큐로 보냈다
 
-## 로컬 실행
+Discord 알림과 GitHub Check 동기화는 외부 API 호출이라 실패 가능성이 높습니다.  
+이걸 webhook 처리나 스캐너 안에서 바로 호출하면, 실패했을 때 복구가 애매해집니다.
 
-1. `.env` 생성
-   - `cp .env.example .env`
-2. 필수 값 설정
-3. 로컬 인프라 실행
-   - `./scripts/dev-up.sh`
-4. 테스트
-   - `./gradlew clean test`
-5. 앱 실행
-   - 기본: `./gradlew bootRun`
-   - 포트 충돌 시: `SERVER_PORT=8081 ./gradlew bootRun`
-6. 헬스체크
-   - 기본: `curl http://localhost:8080/api/health`
-   - 포트 변경 시: `curl http://localhost:8081/api/health`
+그래서 외부 전송은 `outbound_delivery_jobs` 테이블로 분리했습니다.
 
-실제 GitHub App 설치와 webhook 수신까지 로컬에서 검증하려면 `ngrok` 같은 public tunnel이 필요합니다. 자세한 절차는 [docs/runbooks/local-setup.md](docs/runbooks/local-setup.md) 를 참고하세요.
-반복 가능한 임시 데모 세션은 [docs/runbooks/local-demo.md](docs/runbooks/local-demo.md) 를 따릅니다.
+- `DISCORD_NOTIFICATION`
+- `GITHUB_CHECK_SYNC`
 
-## VPS 배포
+그리고 worker가 이 큐를 처리하도록 만들었습니다.
 
-private beta 배포는 `docker compose` 기준으로 고정합니다.
-`docker-compose.beta.yml` 은 `BETA_ENV_FILE` 값을 보고 앱 컨테이너에 주입할 env 파일을 결정합니다. 운영 기본값은 `.env.beta` 입니다.
+- 재시도 정책: `1m -> 5m -> 15m`
+- 최대 3회 실패 시 `DEAD`
+- dead letter로 전환 후 운영자 replay 가능
 
-1. 배포용 env 작성
-   - `cp .env.beta.example .env.beta`
-2. 이미지/서비스 기동
-   - `docker compose --env-file .env.beta -f docker-compose.beta.yml up -d --build`
-3. health 확인
-   - `curl https://<your-host>/api/health`
+이 구조 덕분에 "보냈는지 안 보냈는지 모르는 상태"를 줄일 수 있었습니다.
 
-자세한 절차는 아래 문서를 참고하세요.
+### 3. 사용자 흐름과 운영자 흐름을 분리했다
 
-- 배포: [docs/runbooks/private-beta-launch.md](docs/runbooks/private-beta-launch.md)
-- VPS 준비: [docs/runbooks/vps-bootstrap.md](docs/runbooks/vps-bootstrap.md)
-- 디자인 파트너 온보딩: [docs/runbooks/design-partner-onboarding-checklist.md](docs/runbooks/design-partner-onboarding-checklist.md)
-- 운영 점검: [docs/runbooks/operator-daily-check.md](docs/runbooks/operator-daily-check.md)
-- 장애 복구: [docs/runbooks/incident-triage-replay.md](docs/runbooks/incident-triage-replay.md)
+개발하면서 가장 크게 느낀 문제는 기능보다 사용성이었습니다.  
+처음에는 installation ID를 직접 넣는 식으로 흐름이 열려 있었는데, 이건 일반 사용자 입장에서 불필요하게 어렵습니다.
 
-## 주요 라우트
+그래서 사용자용 재진입 경로를 따로 만들었습니다.
 
-- 사용자 UI
-  - `GET /`
-  - `GET /login/github`
-  - `GET /auth/github/callback`
-  - `GET /app/installations/setup`
-  - `GET /app/installations/{installationId}`
-  - `POST /app/installations/{installationId}/settings`
-- GitHub webhook
-  - `POST /api/webhooks/github`
-- Dashboard
-  - `GET /api/repositories/{repositoryId}/dashboard`
-- Ops UI
-  - `GET /ops/login`
-  - `POST /ops/login`
-  - `POST /ops/logout`
-  - `GET /ops`
-  - `GET /ops/installations`
-  - `GET /ops/deliveries`
-  - `GET /ops/dead-letters`
-  - `POST /ops/dead-letters/{id}/replay`
-- Ops API
-  - `GET /api/admin/dead-letters`
-  - `POST /api/admin/dead-letters/{id}/replay`
-  - `POST /api/repositories/{repositoryId}/pull-requests/{prNumber}/sla/re-evaluate`
-  - `GET /api/admin/audit-logs`
+- 홈에서는 installation ID를 직접 입력하지 않습니다.
+- `설치 후 설정 계속하기`는 `/app/installations`로 들어갑니다.
+- 로그인한 사용자가 접근 가능한 installation이
+  - 0개면 빈 상태 안내
+  - 1개면 바로 설정 화면
+  - 여러 개면 선택 화면
 
-## 운영 메모
+반대로 운영자는 `/ops` 아래에서만 설치, queue, dead letter를 보도록 분리했습니다.
 
-- Discord webhook은 installation 단위로 저장되며 DB에는 암호화된 값만 남습니다.
-- installation이 비설정 상태면 PR 이벤트는 수집되더라도 Discord 알림과 SLA 추적이 시작되지 않고 GitHub Check에 설정 필요 상태만 표시합니다.
-- repository가 installation에서 제거되면 해당 repository는 스캔/대시보드/수동 재평가 대상에서 제외됩니다.
-- `/api/health` 는 DB 연결과 Flyway migration 상태를 기준으로 `200` 또는 `503` 을 반환합니다.
-- `/actuator/prometheus` 는 `X-Admin-Api-Key` 헤더가 필요합니다.
-- `/ops/**` 는 별도 ops 세션이 필요하고, 세션은 `/ops/login` 에서 `OPS_ADMIN_API_KEY` 로 엽니다.
+## 구현하면서 중요했던 포인트
 
-## 검증 명령
+### GitHub Check는 "보여주기용"이 아니라 상태 모델이어야 했다
+
+이 프로젝트에서 GitHub Check는 단순한 부가 기능이 아닙니다.  
+사용자가 가장 먼저 보는 결과물이기 때문에, SLA 상태를 GitHub PR 화면에서 바로 이해할 수 있어야 했습니다.
+
+그래서 `ready_for_review`, `review submitted`, scanner 결과에 따라 Check 상태를 계속 동기화하도록 만들었습니다.
+
+### 실패한 전송은 로그가 아니라 운영 대상이어야 했다
+
+알림 실패를 warning log로만 남기면 나중에 운영자가 놓치기 쉽습니다.  
+그래서 실패는 queue 상태와 dead letter로 남기고, ops UI에서 replay 가능한 구조로 만들었습니다.
+
+### 데모와 실제 사용은 생각보다 다르다
+
+직접 여러 번 데모를 돌려보니, 기술적으로는 동작해도 사용자가 막히는 지점이 분명했습니다.
+
+- 홈에서 다음 행동이 명확한지
+- 설치 후 설정 화면으로 자연스럽게 이어지는지
+- "이 서비스가 지금 뭘 해줬는지"를 사용자가 바로 이해하는지
+
+그래서 최근에는 기능 추가보다 온보딩 단순화와 데모 키트 자동화에 더 많은 시간을 썼습니다.
+
+## 기술 스택
+
+- Java 21
+- Spring Boot
+- Spring Security
+- Spring Data JPA
+- PostgreSQL
+- Flyway
+- Thymeleaf
+- Docker / Docker Compose
+- Caddy
+- GitHub App / GitHub Checks API
+- Discord Webhook
+
+## 검증은 어떻게 했는가
+
+문서만 쌓아두지 않고 실제 흐름을 여러 번 검증했습니다.
+
+자동 검증:
 
 - `./gradlew clean test`
 - `./scripts/check.sh`
+
+수동 검증:
+
+- GitHub App 설치
+- setup callback 진입
+- Discord webhook 저장
+- draft PR -> `Ready for review`
+- GitHub PR에서 `Club PR SLA — On track` 확인
+- `/ops` 화면에서 installation / deliveries / dead letters 확인
+
+추가로 로컬 데모를 반복하기 쉽게 만들기 위해 아래 스크립트를 넣었습니다.
+
+- `./scripts/demo-up.sh`
+- `./scripts/demo-status.sh`
+- `./scripts/demo-down.sh`
+
+이 스크립트는 포트 충돌이 있어도 `8080/8081`, `5432/5433` 중 가능한 값을 골라 데모 세션을 자동으로 띄우고 정리합니다.
+
+## 아쉬운 점
+
+아직 "누가 봐도 쉬운 제품"이라고 하긴 어렵습니다.
+
+- GitHub App 자체를 운영자가 먼저 준비해야 합니다.
+- 설치형 제품으로는 입구가 더 단순해져야 합니다.
+- 아직은 private beta 수준이고, self-serve public product로 보기엔 부족합니다.
+- 관측과 운영 자동화도 더 보강할 부분이 남아 있습니다.
+
+즉, 현재 평가는 이렇습니다.
+
+- 엔진: 꽤 단단해졌음
+- 운영 도구로서의 구조: 실사용 가능
+- 일반 사용자에게 쉬운 제품성: 더 개선 필요
+
+## 다음 단계
+
+다음 우선순위는 명확합니다.
+
+1. 실제 사용자 데모를 여러 번 돌리면서 막히는 지점을 수집
+2. 온보딩 UX를 더 줄이고 설명보다 행동 중심으로 다듬기
+3. 단일 VPS 또는 관리형 플랫폼에 private beta 배포
+4. 운영 메트릭과 장애 대응 자동화 보강
+
+## 실행과 문서
+
+상세 실행 절차는 아래 문서를 참고하면 됩니다.
+
+- 로컬 실행: [docs/runbooks/local-setup.md](docs/runbooks/local-setup.md)
+- 반복 데모: [docs/runbooks/local-demo.md](docs/runbooks/local-demo.md)
+- GitHub App 설정: [docs/runbooks/github-app-checklist.md](docs/runbooks/github-app-checklist.md)
+- private beta 배포: [docs/runbooks/private-beta-launch.md](docs/runbooks/private-beta-launch.md)
+- VPS 준비: [docs/runbooks/vps-bootstrap.md](docs/runbooks/vps-bootstrap.md)
+- 운영 점검: [docs/runbooks/operator-daily-check.md](docs/runbooks/operator-daily-check.md)
+
+## 한 줄 요약
+
+이 프로젝트는 **PR 리뷰 지연을 GitHub Check와 Discord로 추적하고, 운영자가 실패까지 관리할 수 있게 만든 설치형 GitHub App 서비스**입니다.

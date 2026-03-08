@@ -7,6 +7,10 @@
   <body>
     <main>
       <h1 th:text="${installation.accountLogin()}">installation</h1>
+      <p th:if="${saved}" th:text="${successMessage}">
+        Discord webhook이 저장되었습니다. 이제 draft PR을 Ready for review로 바꾸면 Club PR SLA
+        check를 확인할 수 있습니다.
+      </p>
       <p th:if="${error}" th:text="${error}">error</p>
       <form
           th:action="@{/app/installations/{installationId}/settings(installationId=${installation.installationId()})}"

@@ -48,6 +48,18 @@ public class DefaultInstallationOnboardingService implements InstallationOnboard
   }
 
   @Override
+  public List<InstallationOnboardingView> listAccessibleInstallations(
+      GithubAuthenticatedUser authenticatedUser) {
+    return githubAppClient.listUserInstallations(authenticatedUser.accessToken()).stream()
+        .filter(
+            installationMetadata ->
+                betaAccessPolicy.isAllowed(
+                    authenticatedUser.login(), installationMetadata.accountLogin()))
+        .map(this::toOnboardingView)
+        .toList();
+  }
+
+  @Override
   public boolean userCanAccessInstallation(
       GithubAuthenticatedUser authenticatedUser, Long installationId) {
     if (!githubAppClient.userCanAccessInstallation(
@@ -62,37 +74,7 @@ public class DefaultInstallationOnboardingService implements InstallationOnboard
 
   @Override
   public InstallationOnboardingView loadInstallationView(Long installationId) {
-    GithubInstallationMetadata installationMetadata =
-        githubAppClient.fetchInstallation(installationId);
-    List<GithubRepositoryMetadata> repositoryMetadata =
-        githubAppClient.listInstallationRepositories(installationId);
-
-    installationRegistryService.upsertInstallation(
-        new GithubInstallationUpsertCommand(
-            installationMetadata.installationId(),
-            installationMetadata.accountId(),
-            installationMetadata.accountLogin(),
-            installationMetadata.accountType(),
-            installationMetadata.installedAt()));
-    installationRegistryService.syncRepositories(
-        installationId,
-        repositoryMetadata.stream()
-            .map(
-                repository ->
-                    new GithubInstallationRepositoryEntryUpsertCommand(
-                        repository.repositoryId(),
-                        repository.repositoryName(),
-                        repository.repositoryFullName()))
-            .toList());
-
-    Optional<InstallationSettings> maybeSettings =
-        Optional.ofNullable(installationSettingsRepository.findById(installationId))
-            .orElse(Optional.empty());
-    return new InstallationOnboardingView(
-        installationId,
-        installationMetadata.accountLogin(),
-        repositoryMetadata.stream().map(GithubRepositoryMetadata::repositoryFullName).toList(),
-        maybeSettings.map(InstallationSettings::isConfigured).orElse(false));
+    return toOnboardingView(githubAppClient.fetchInstallation(installationId));
   }
 
   @Override
@@ -104,5 +86,39 @@ public class DefaultInstallationOnboardingService implements InstallationOnboard
     }
     installationRegistryService.saveSettings(
         installationId, new InstallationSettingsUpdateCommand(discordWebhookUrl, true));
+  }
+
+  private InstallationOnboardingView toOnboardingView(
+      GithubInstallationMetadata installationMetadata) {
+    List<GithubRepositoryMetadata> repositoryMetadata =
+        githubAppClient.listInstallationRepositories(installationMetadata.installationId());
+
+    installationRegistryService.upsertInstallation(
+        new GithubInstallationUpsertCommand(
+            installationMetadata.installationId(),
+            installationMetadata.accountId(),
+            installationMetadata.accountLogin(),
+            installationMetadata.accountType(),
+            installationMetadata.installedAt()));
+    installationRegistryService.syncRepositories(
+        installationMetadata.installationId(),
+        repositoryMetadata.stream()
+            .map(
+                repository ->
+                    new GithubInstallationRepositoryEntryUpsertCommand(
+                        repository.repositoryId(),
+                        repository.repositoryName(),
+                        repository.repositoryFullName()))
+            .toList());
+
+    Optional<InstallationSettings> maybeSettings =
+        Optional.ofNullable(
+                installationSettingsRepository.findById(installationMetadata.installationId()))
+            .orElse(Optional.empty());
+    return new InstallationOnboardingView(
+        installationMetadata.installationId(),
+        installationMetadata.accountLogin(),
+        repositoryMetadata.stream().map(GithubRepositoryMetadata::repositoryFullName).toList(),
+        maybeSettings.map(InstallationSettings::isConfigured).orElse(false));
   }
 }

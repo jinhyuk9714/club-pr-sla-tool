@@ -59,6 +59,61 @@ class RestGithubAppClientTest {
   }
 
   @Test
+  void listsUserInstallationsFromGithubUserApi() {
+    RestClient.Builder restClientBuilder = RestClient.builder();
+    MockRestServiceServer mockRestServiceServer =
+        MockRestServiceServer.bindTo(restClientBuilder).ignoreExpectOrder(true).build();
+    RestGithubAppClient restGithubAppClient =
+        new RestGithubAppClient(
+            restClientBuilder,
+            githubAppJwtService,
+            "client-id",
+            "client-secret",
+            "https://github.com",
+            "https://api.github.test");
+
+    mockRestServiceServer
+        .expect(requestTo("https://api.github.test/user/installations"))
+        .andExpect(method(HttpMethod.GET))
+        .andExpect(header("Authorization", "Bearer user-token"))
+        .andRespond(
+            withSuccess(
+                """
+                {
+                  "total_count": 2,
+                  "installations": [
+                    {
+                      "id": 7001,
+                      "account": {"id": 991, "login": "club-org", "type": "Organization"},
+                      "created_at": "2026-03-06T00:00:00Z"
+                    },
+                    {
+                      "id": 7002,
+                      "account": {"id": 992, "login": "alice", "type": "User"},
+                      "created_at": "2026-03-07T00:00:00Z"
+                    }
+                  ]
+                }
+                """,
+                MediaType.APPLICATION_JSON));
+
+    assertThat(restGithubAppClient.listUserInstallations("user-token"))
+        .containsExactly(
+            new GithubInstallationMetadata(
+                7001L,
+                991L,
+                "club-org",
+                GithubInstallationAccountType.ORGANIZATION,
+                java.time.Instant.parse("2026-03-06T00:00:00Z")),
+            new GithubInstallationMetadata(
+                7002L,
+                992L,
+                "alice",
+                GithubInstallationAccountType.USER,
+                java.time.Instant.parse("2026-03-07T00:00:00Z")));
+  }
+
+  @Test
   void fetchesInstallationAndRepositories() {
     RestClient.Builder restClientBuilder = RestClient.builder();
     MockRestServiceServer mockRestServiceServer =

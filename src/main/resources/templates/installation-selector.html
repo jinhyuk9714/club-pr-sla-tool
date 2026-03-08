@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title th:text="${title}">Installation Selector</title>
+  </head>
+  <body>
+    <main>
+      <h1 th:text="${title}">설치 선택</h1>
+      <p th:text="${message}">설치 선택 안내</p>
+
+      <section th:if="${emptyState}">
+        <p>
+          <a th:href="${installUrl}">GitHub App 설치</a>
+        </p>
+        <p>
+          <a th:href="${loginUrl}">GitHub 로그인 다시 시도</a>
+        </p>
+      </section>
+
+      <section th:unless="${emptyState}">
+        <ul>
+          <li th:each="installation : ${installations}">
+            <h2 th:text="${installation.accountLogin()}">account</h2>
+            <p th:text="${installation.configured()} ? 'Discord 연결 완료' : 'Discord 연결 필요'">
+              configured
+            </p>
+            <ul>
+              <li
+                  th:each="repository : ${installation.repositoryFullNames()}"
+                  th:text="${repository}">
+                repository
+              </li>
+            </ul>
+            <p>
+              <a
+                  th:href="@{/app/installations/{installationId}(installationId=${installation.installationId()})}">
+                설정 열기
+              </a>
+            </p>
+          </li>
+        </ul>
+        <p>
+          <a th:href="${installUrl}">다른 저장소에 GitHub App 설치</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

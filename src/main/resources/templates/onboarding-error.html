@@ -11,6 +11,9 @@
       <p>
         <a th:href="${installUrl}">GitHub App 설치로 이동</a>
       </p>
+      <p th:if="${resumeUrl}">
+        <a th:href="${resumeUrl}">내 설치 다시 보기</a>
+      </p>
       <p>
         <a th:href="${loginUrl}">GitHub 로그인 다시 시도</a>
       </p>

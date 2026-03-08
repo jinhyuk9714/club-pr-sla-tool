@@ -33,6 +33,11 @@ class HomePageControllerTest {
         .andExpect(content().string(org.hamcrest.Matchers.containsString("GitHub App 설치")))
         .andExpect(content().string(org.hamcrest.Matchers.containsString("설치 후 설정 계속하기")))
         .andExpect(
-            content().string(org.hamcrest.Matchers.containsString("name=\"installation_id\"")));
+            content().string(org.hamcrest.Matchers.containsString("href=\"/app/installations\"")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("name=\"installation_id\""))));
   }
 }

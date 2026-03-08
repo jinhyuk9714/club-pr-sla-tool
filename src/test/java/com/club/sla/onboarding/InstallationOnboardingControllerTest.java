@@ -29,6 +29,70 @@ class InstallationOnboardingControllerTest {
   @MockBean private InstallationOnboardingService installationOnboardingService;
 
   @Test
+  void redirectsAnonymousUserToGithubLoginFromInstallationsRoute() throws Exception {
+    given(githubUserSessionService.currentUser()).willReturn(Optional.empty());
+
+    mockMvc
+        .perform(get("/app/installations"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/login/github?returnTo=%2Fapp%2Finstallations"));
+  }
+
+  @Test
+  void redirectsAuthorizedUserToSingleAccessibleInstallation() throws Exception {
+    GithubAuthenticatedUser authenticatedUser =
+        new GithubAuthenticatedUser(101L, "alice", "user-token");
+    InstallationOnboardingView installationOnboardingView =
+        new InstallationOnboardingView(7001L, "club-org", List.of("club-org/club-pr-tool"), false);
+    given(githubUserSessionService.currentUser()).willReturn(Optional.of(authenticatedUser));
+    given(installationOnboardingService.listAccessibleInstallations(authenticatedUser))
+        .willReturn(List.of(installationOnboardingView));
+
+    mockMvc
+        .perform(get("/app/installations"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/app/installations/7001"));
+  }
+
+  @Test
+  void rendersInstallationSelectorWhenUserHasMultipleAccessibleInstallations() throws Exception {
+    GithubAuthenticatedUser authenticatedUser =
+        new GithubAuthenticatedUser(101L, "alice", "user-token");
+    InstallationOnboardingView firstInstallation =
+        new InstallationOnboardingView(7001L, "club-org", List.of("club-org/club-pr-tool"), false);
+    InstallationOnboardingView secondInstallation =
+        new InstallationOnboardingView(7002L, "club-web", List.of("club-web/site"), true);
+    given(githubUserSessionService.currentUser()).willReturn(Optional.of(authenticatedUser));
+    given(installationOnboardingService.listAccessibleInstallations(authenticatedUser))
+        .willReturn(List.of(firstInstallation, secondInstallation));
+
+    mockMvc
+        .perform(get("/app/installations"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("installation-selector"))
+        .andExpect(
+            model().attribute("installations", List.of(firstInstallation, secondInstallation)))
+        .andExpect(model().attribute("emptyState", false));
+  }
+
+  @Test
+  void rendersEmptyInstallationsStateWhenNoAccessibleInstallationExists() throws Exception {
+    GithubAuthenticatedUser authenticatedUser =
+        new GithubAuthenticatedUser(101L, "alice", "user-token");
+    given(githubUserSessionService.currentUser()).willReturn(Optional.of(authenticatedUser));
+    given(installationOnboardingService.listAccessibleInstallations(authenticatedUser))
+        .willReturn(List.of());
+
+    mockMvc
+        .perform(get("/app/installations"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("installation-selector"))
+        .andExpect(model().attribute("installations", List.of()))
+        .andExpect(model().attribute("emptyState", true))
+        .andExpect(model().attribute("title", "설치된 GitHub App이 없습니다"));
+  }
+
+  @Test
   void redirectsAnonymousUserToGithubLoginFromSetupRoute() throws Exception {
     given(githubUserSessionService.currentUser()).willReturn(Optional.empty());
 
@@ -87,7 +151,29 @@ class InstallationOnboardingControllerTest {
         .perform(get("/app/installations/7001"))
         .andExpect(status().isOk())
         .andExpect(view().name("installation-settings"))
-        .andExpect(model().attribute("installation", installationOnboardingView));
+        .andExpect(model().attribute("installation", installationOnboardingView))
+        .andExpect(model().attribute("saved", false));
+  }
+
+  @Test
+  void rendersSettingsPageWithSavedBannerWhenSettingsWereSaved() throws Exception {
+    GithubAuthenticatedUser authenticatedUser =
+        new GithubAuthenticatedUser(101L, "alice", "user-token");
+    InstallationOnboardingView installationOnboardingView =
+        new InstallationOnboardingView(7001L, "club-org", List.of("club-org/club-pr-tool"), true);
+    given(githubUserSessionService.currentUser()).willReturn(Optional.of(authenticatedUser));
+    given(installationOnboardingService.userCanAccessInstallation(authenticatedUser, 7001L))
+        .willReturn(true);
+    given(installationOnboardingService.loadInstallationView(7001L))
+        .willReturn(installationOnboardingView);
+
+    mockMvc
+        .perform(get("/app/installations/7001").param("saved", "1"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("installation-settings"))
+        .andExpect(model().attribute("installation", installationOnboardingView))
+        .andExpect(model().attribute("saved", true))
+        .andExpect(model().attributeExists("successMessage"));
   }
 
   @Test

@@ -19,6 +19,7 @@ public class HomePageController {
   @GetMapping("/")
   public String home(Model model) {
     model.addAttribute("installUrl", installUrl);
+    model.addAttribute("resumeUrl", "/app/installations");
     return "home";
   }
 }

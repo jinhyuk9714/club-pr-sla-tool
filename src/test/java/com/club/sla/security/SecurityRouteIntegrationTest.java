@@ -47,6 +47,14 @@ class SecurityRouteIntegrationTest {
   }
 
   @Test
+  void allowsInstallationsRouteToReachControllerLoginRedirect() throws Exception {
+    mockMvc
+        .perform(get("/app/installations"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/login/github?returnTo=%2Fapp%2Finstallations"));
+  }
+
+  @Test
   void requiresAuthenticatedSessionForInstallationRoutes() throws Exception {
     mockMvc.perform(get("/app/installations/7001")).andExpect(status().isUnauthorized());
   }
